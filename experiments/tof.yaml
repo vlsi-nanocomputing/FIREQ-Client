@@ -1,0 +1,53 @@
+# ── Preprocess variables ──────────────────────────────────────────
+preprocess:
+  drive_frequency: 3000.0
+  readout_frequency: 7500
+  gain: 0.5
+  duration: 1500
+  shots: 100
+
+variables:
+  tof:
+    start: 10
+    stop: 215
+    num: 10
+    mode: lin
+
+# ── System configuration tree ─────────────────────────────────────
+sys_config:
+  $shots: "%shots"   # run 1 experiment shots
+
+  # ── Generator sub-tree ──────────────────────────────────────────
+  /axisGeneratorIP_0:
+    $dfrequency: 0                # drive modulation frequency (MHz)
+    $rfrequency: "%readout_frequency"               # readout modulation frequency (MHz)
+    $rphase: 0.0                      # readout initial phase (rad)
+    $rchannel: 1                      # readout trigger channel (1 = active)
+    $dchannel: 0                      # drive trigger channel  (0 = NOT active)
+    # Create a readout pulse
+    pulse:
+      - _name: rect_r
+        _readout: true
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: "%duration"
+        $gain: "%gain"                
+
+  # ── Acquisition sub-tree ────────────────────────────────────────
+  /axisAcquisitionIP_0:
+    $duration: "%duration"                 # acquisition window (ns)
+    $output_type: decimated           # "raw" | "decimated" | "accumulated"
+    $rfrequency: "%readout_frequency"   # demodulation frequency (MHz)
+    $rphase: 0.0                      # demodulation phase (rad)
+    $rchannel: 1                      # trigger channel (0 = off)
+    $tof: "#tof"                        # time-of-flight (ns)
+
+  # ── Trigger generator sub-tree ──────────────────────────────────
+  /axisTriggerGenerator_0:
+    $experiment_duration: 3000.0    # per-shot duration (ns)
+    delay:
+      - _name: readout_delay_0
+        _ttype: readout
+        _channel_mask: 1
+        _index: 1
+        $delay: 100                  # ns

@@ -1,0 +1,60 @@
+# qubit spectroscopy
+
+preprocess:
+  readout_modulation_frequency: 7583.46
+  gain_d: 0.3
+  gain_r: 0.2
+  readout_duration: 1000
+  drive_duration: 5000
+  tof: 200
+
+variables:
+  drive_frequency_sweep:
+    start: 5600
+    stop: 5660
+    num: 1000
+    mode: lin
+
+sys_config:
+  $shots: 1000
+  /axisGeneratorIP_0:
+    $dfrequency: "#drive_frequency_sweep"
+    $rfrequency: "%readout_modulation_frequency"
+    $rphase: 0.0
+    $rchannel: 1
+    $dchannel: 1
+    pulse:
+      - _name: rect_d
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: "%drive_duration"
+        $gain: "%gain_d"
+      - _name: rect_r
+        _readout: true
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: "%readout_duration"
+        $gain: "%gain_r"
+    $drive_order:
+      - rect_d
+  /axisAcquisitionIP_0:
+    $duration: "%readout_duration"
+    $output_type: accumulated
+    $rfrequency: "%readout_modulation_frequency"
+    $rphase: 0.0
+    $rchannel: 1
+    $tof: "%tof"
+  /axisTriggerGenerator_0:
+    $experiment_duration: 10000.0
+    delay:
+      - _name: drive_delay_0
+        _ttype: drive
+        _channel_mask: 1
+        _index: 1
+        $delay: 100
+      - _name: readout_delay_0
+        _ttype: readout
+        _channel_mask: 1
+        _index: 2
+        $delay: 6000

@@ -1,0 +1,37 @@
+preprocess: {}
+variables: 
+  freq:
+    start: 1000
+    stop: 4000
+    num: 1000
+    mode: lin
+sys_config:
+  $shots: 1000
+  /axisGeneratorIP_0:
+    $dfrequency: 0
+    $rfrequency: "#freq"
+    $rphase: 0.0
+    $rchannel: 1
+    $dchannel: 0
+    pulse:
+      - _name: rect
+        _readout: true
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: 1000.0
+        $gain: 0.5
+  /axisAcquisitionIP_0:
+    $duration: 1500
+    $output_type: accumulated
+    $rfrequency: "#freq"
+    $rphase: 0
+    $rchannel: 1
+    $tof: 160
+  /axisTriggerGenerator_0:
+    $experiment_duration: 102000.0
+    delay:
+      - _name: readout_delay_0
+        _ttype: readout
+        _channel_mask: 1
+        _index: 1
+        $delay: 100

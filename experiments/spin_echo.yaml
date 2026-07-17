@@ -1,0 +1,80 @@
+# SPIN echo
+
+preprocess:
+  drive_modulation_frequency: 5625.213468
+  drive_duration: 200
+  readout_duration: 1000
+  readout_modulation_frequency: 7583.46
+  gain_pi: 0.101
+  gain_pi_half: 0.0505
+  gain_r: 0.2
+  tof: 200
+
+variables:
+  drive_delay_sweep_half:
+    start: 10
+    stop: 40000
+    num: 1000
+    mode: lin
+
+sys_config:
+  $shots: 1000
+  /axisGeneratorIP_0:
+    $dfrequency: "%drive_modulation_frequency"
+    $rfrequency: "%readout_modulation_frequency"
+    $rphase: 0.0
+    $rchannel: 1
+    $dchannel: 1
+    pulse:
+      - _name: rect_pi_half
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: "%drive_duration"
+        $gain: "%gain_pi_half"
+      - _name: rect_pi
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: "%drive_duration"
+        $gain: "%gain_pi"
+      - _name: rect_r
+        _readout: true
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: "%readout_duration"
+        $gain: "%gain_r"
+    $drive_order:
+      - rect_pi_half
+      - rect_pi
+      - rect_pi_half
+  /axisAcquisitionIP_0:
+    $duration: "%readout_duration"
+    $output_type: accumulated
+    $rfrequency: "%readout_modulation_frequency"
+    $rphase: 0.0
+    $rchannel: 1
+    $tof: "%tof"
+  /axisTriggerGenerator_0:
+    $experiment_duration: 140000
+    delay:
+      - _name: drive_delay_0
+        _ttype: drive
+        _channel_mask: 1
+        _index: 1
+        $delay: 100
+      - _name: drive_delay_1
+        _ttype: drive
+        _channel_mask: 1
+        _index: 2
+        $delay: "#drive_delay_sweep_half+200"
+      - _name: drive_delay_2
+        _ttype: drive
+        _channel_mask: 1
+        _index: 3
+        $delay: "#drive_delay_sweep_half+200"
+      - _name: readout_delay_0
+        _ttype: readout
+        _channel_mask: 1
+        _index: 4
+        $delay: 300

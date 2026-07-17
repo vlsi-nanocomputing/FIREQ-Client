@@ -1,0 +1,39 @@
+preprocess: {}
+variables: {}
+sys_config:
+  $shots: 100000
+  /axisGeneratorIP_0:
+    $dfrequency: 600.0
+    $rfrequency: 0
+    $rphase: 0.0
+    $rchannel: 0
+    $dchannel: 1
+    pulse:
+      - _name: rect
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: 2
+        $duration: 5000.0
+        $gain: 0.5
+    $drive_order:
+      - rect
+  /axisAcquisitionIP_0:
+    $duration: 1500.0
+    $output_type: accumulated
+    $rfrequency: 3000
+    $rphase: 0.0
+    $rchannel: 1
+    $tof: 2
+  /axisTriggerGenerator_0:
+    $experiment_duration: 20000
+    delay:
+      - _name: drivedel
+        _ttype: drive
+        _channel_mask: 1
+        _index: 1
+        $delay: 100
+      - _name: readout_delay_0
+        _ttype: readout
+        _channel_mask: 1
+        _index: 2
+        $delay: 10000

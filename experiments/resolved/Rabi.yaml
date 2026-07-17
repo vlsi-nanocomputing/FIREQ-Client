@@ -1,0 +1,54 @@
+variables:
+  drive_duration_sweep:
+    start: 10
+    end: 100
+    num: 500
+    mode: lin
+  gain_sweep:
+    start: 0.005
+    end: 0.5
+    num: 3000
+    mode: lin
+sys_config:
+  $shots: 1000
+  /axisGeneratorIP_0:
+    $dfrequency: 6000
+    $rfrequency: 3000
+    $rphase: 0.0
+    $rchannel: 1
+    $dchannel: 1
+    pulse:
+    - _name: rect_d
+      _readout: false
+      _envelope: _RECTANGULAR
+      _dac_target: 2
+      $duration: '#drive_duration_sweep'
+      $gain: '#gain_sweep'
+    - _name: rect_r
+      _readout: true
+      _envelope: _RECTANGULAR
+      _dac_target: 2
+      $duration: 1000
+      $gain: 0.5
+    $drive_order:
+    - rect_d
+  /axisAcquisitionIP_0:
+    $duration: '1500'
+    $output_type: accumulated
+    $rfrequency: 3000
+    $rphase: 0.0
+    $rchannel: 1
+    $tof: 1
+  /axisTriggerGenerator_0:
+    $experiment_duration: 102000.0
+    delay:
+    - _name: drive_delay_0
+      _ttype: drive
+      _channel_mask: 1
+      _index: 1
+      $delay: 1000.0
+    - _name: readout_delay_0
+      _ttype: readout
+      _channel_mask: 1
+      _index: 2
+      $delay: 10.0

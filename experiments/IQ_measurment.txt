@@ -1,0 +1,136 @@
+# IQ measurment
+# with |0> state:
+
+
+## single variable define #########
+drive_modulation_frequency = 3000
+readout_modulation_frequency = 500
+drive_duration = 20
+gain_pi = 0.5
+gain_r = 0.5
+tof = 1
+###################################
+
+
+
+config = {
+    # ── System-level parameters ──────────────────────────────────────
+    "$shots": 1000,  # run 1000 experiment shots
+    # ── Generator sub-tree ───────────────────────────────────────────
+    "/axisGeneratorIP_0": {
+        "$dfrequency": drive_modulation_frequency,  # drive modulation frequency (MHz)
+        "$rfrequency": readout_modulation_frequency ,  # readout modulation frequency (MHz)
+        "$rphase": 0.0,  # readout initial phase (rad)
+        "$rchannel": 1,  # readout trigger channel (1 = active)
+        "$dchannel": 0,  # drive trigger channel  (0 = NOT active)
+        # Create a readout pulse (uses the readout wave definition reg).
+        "pulse": [
+            {
+                "_name": "rect_r",
+                "_readout": True,
+                "_envelope": "_RECTANGULAR",
+                "_dac_target": 2,
+                "$duration": 1000.0,
+                "$gain": gain_r,
+            }
+        ],
+    },
+    # ── Acquisition sub-tree ─────────────────────────────────────────
+    "/axisAcquisitionIP_0": {
+        "$duration": 1500.0,  # acquisition window (ns)
+        "$output_type": "accumulated",  # "raw" | "decimated" | "accumulated"
+        "$rfrequency": "#frequency_sweep",  # demodulation frequency (MHz)
+        "$rphase": 0.0,  # demodulation phase (rad)
+        "$rchannel": 1,  # trigger channel (0 = off)
+        "$tof": tof,  # time-of-flight (ns)
+    },
+    # ── Trigger generator sub-tree ───────────────────────────────────
+    "/axisTriggerGenerator_0": {
+        "$experiment_duration": 102000.0,  # per-shot duration (ns)
+        # Create drive & readout delay entries.
+        "delay": [
+            {
+                "_name": "readout_delay_0",
+                "_ttype": "readout",
+                "_channel_mask": 1,
+                "_index": 1,
+                "$delay": 10.0,  # ns
+            },
+        ],
+    },
+}
+
+
+
+# with |1> state:
+
+"frequency_sweep" : {"start" : 6000, "end" : 7000, "num" : 3000, "mode": "lin"
+config = {
+    # ── System-level parameters ──────────────────────────────────────
+    "$shots": 1000,  # run 1000 experiment shots
+    # ── Generator sub-tree ───────────────────────────────────────────
+    "/axisGeneratorIP_0": {
+        "$dfrequency": drive_modulation_frequency,  # drive modulation frequency (MHz)
+        "$rfrequency": readout_modulation_frequency ,  # readout modulation frequency (MHz)
+        "$rphase": 0.0,  # readout initial phase (rad)
+        "$rchannel": 1,  # readout trigger channel (1 = active)
+        "$dchannel": 1,  # drive trigger channel  (1 = NOT active)
+        # Create a readout pulse (uses the readout wave definition reg).
+        "pulse": [
+            {
+                "_name": "rect_pi",
+                "_readout": False,
+                "_envelope": "_RECTANGULAR",
+                "_dac_target": 2,
+                "$duration": drive_duration,
+                "$gain": gain_pi,
+            },
+            {
+                "_name": "rect_r",
+                "_readout": True,
+                "_envelope": "_RECTANGULAR",
+                "_dac_target": 2,
+                "$duration": 1000.0,
+                "$gain": gain_r,
+            }
+        ],
+		
+        # Set the drive order — the ordered list of pulses to play.
+        "$drive_order": ["rect_pi"],
+    },
+    # ── Acquisition sub-tree ─────────────────────────────────────────
+    "/axisAcquisitionIP_0": {
+        "$duration": 1500.0,  # acquisition window (ns)
+        "$output_type": "accumulated",  # "raw" | "decimated" | "accumulated"
+        "$rfrequency": "#frequency_sweep",  # demodulation frequency (MHz)
+        "$rphase": 0.0,  # demodulation phase (rad)
+        "$rchannel": 1,  # trigger channel (0 = off)
+        "$tof": tof,  # time-of-flight (ns)
+    },
+    # ── Trigger generator sub-tree ───────────────────────────────────
+    "/axisTriggerGenerator_0": {
+        "$experiment_duration": 102000.0,  # per-shot duration (ns)
+        # Create drive & readout delay entries.
+        "delay": [
+            {
+                "_name": "drive_delay",
+                "_ttype": "drive",
+                "_channel_mask": 1,
+                "_index": 1,
+                "$delay": 1000.0,  # ns
+            },
+        ],
+		
+		"delay": [
+            {
+                "_name": "readout_delay",
+                "_ttype": "readout",
+                "_channel_mask": 1,
+                "_index": 2,
+                "$delay": 10.0,  # ns
+            },
+        ],
+    },
+}
+
+
