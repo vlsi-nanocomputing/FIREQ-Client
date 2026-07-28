@@ -1,12 +1,11 @@
 
-## `docs/api.md`
+## `FIREQ-Client/docs/api.md`
 
-````markdown
+Per ora, nella fase minimale, metterei questo:
+
+```markdown
 # Client API
 
-This page documents the main Python API of FIREQ-Client.
+This page will document the main Python API of FIREQ-Client.
 
-```{automodule} client_package
-:members:
-:undoc-members:
-:show-inheritance:
+Automatic API generation will be enabled in a later step.
