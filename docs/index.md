@@ -17,6 +17,28 @@ For a more detailed explanation, see:
 - [Usage](usage.md)
 - [API](api.md)
 
+## Contributing and Support
+
+The GitHub repository for FIREQ-Client is here:
+
+- [FIREQ-Client on GitHub](https://github.com/vlsi-nanocomputing/FIREQ-Client)
+
+Contributions to FIREQ-Client are welcome.
+
+You can contribute by:
+
+- improving the client implementation;
+- adding or updating examples in `experiments/`;
+- improving the documentation in `docs/`;
+- reporting bugs or unexpected behavior;
+- suggesting new features or use cases.
+
+If you find a problem, please open an issue on GitHub:
+
+- [Issues](https://github.com/vlsi-nanocomputing/FIREQ-Client/issues)
+
+If you have questions, ideas, or need support, feel free to create a discussion or open an issue on GitHub.
+
 ```{toctree}
 :maxdepth: 2
 :hidden:
