@@ -1,5 +1,11 @@
 # Usage
 
+Before using the client, make sure the FIREQ server is already running. The client connects to the server over TCP, so the server must be started first.
+
+For server-side setup and deployment details, see the server documentation in the server repository:
+
+- [FIREQ-Server README](../../FIREQ-Server/README.md)
+
 The client is primarily used through an interactive command loop started by:
 
 ```bash
@@ -69,11 +75,12 @@ A typical configuration includes:
 
 A simple workflow is:
 
-1. open the client with `python run_client.py`,
-2. connect to the server,
-3. run an experiment with `run_yaml experiments/Rabi.yaml`,
-4. wait for the acquisition to complete,
-5. inspect the generated output files.
+1. start the FIREQ server first,
+2. open the client with `python run_client.py`,
+3. connect to the server,
+4. run an experiment with `run_yaml experiments/Rabi.yaml`,
+5. wait for the acquisition to complete,
+6. inspect the generated output files.
 
 ## Output structure
 
