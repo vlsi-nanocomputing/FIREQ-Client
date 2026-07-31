@@ -3,7 +3,7 @@ name: Trigger FIREQ documentation rebuild
 on:
   push:
     branches:
-      - docs/initial_doc
+      - docs/**
     paths:
       - "docs/**"
 

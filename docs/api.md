@@ -4,7 +4,7 @@ This page describes how the FIREQ-Client works as a client-side interface, focus
 
 ## Scope
 
-FIREQ-Client is a thin Python client used to connect to the FIREQ server, send experiment commands, receive results, and save them locally. Its role is mostly operational: it acts as the front-end that talks to the server and orchestrates experiment execution.
+FIREQ-Client is a Python client used to connect to the FIREQ server, send experiment commands, receive results, and save them locally. Its role is mostly operational: it acts as the front-end that talks to the server and orchestrates experiment execution.
 
 ## Main entry point
 
