@@ -61,16 +61,6 @@ When a parameter is modified through the YAML structure, it remains associated w
 
 In practice, this means that the client and server maintain the current hardware state across configuration updates, so users may need to reset the system or update the relevant parameters carefully when changing experiments.
 
-## Example: TOF experiment
-
-A simple example is the TOF experiment configuration stored in `experiments/tof.yaml`. It demonstrates how a sweep over a time-of-flight parameter is defined and how the resulting acquisition data are stored.
-
-A typical configuration includes:
-
-- a preprocess section with frequencies, gain, duration, and shots,
-- a `variables` section for the sweep values,
-- a `sys_config` section with nodes such as the generator, the acquisition unit, and the trigger generator.
-
 ## Running an experiment
 
 A simple workflow is:
