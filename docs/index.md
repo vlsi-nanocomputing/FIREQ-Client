@@ -17,6 +17,16 @@ For a more detailed explanation, see:
 - [Usage](usage.md)
 - [API](api.md)
 
+```{toctree}
+:maxdepth: 2
+:caption: Index
+
+overview
+installation
+usage
+api
+```
+
 ## Contributing and Support
 
 The GitHub repository for FIREQ-Client is here:
@@ -39,12 +49,3 @@ If you find a problem, please open an issue on GitHub:
 
 If you have questions, ideas, or need support, feel free to create a discussion or open an issue on GitHub.
 
-```{toctree}
-:maxdepth: 2
-:hidden:
-
-overview
-installation
-usage
-api
-```
