@@ -2,9 +2,7 @@
 
 Before using the client, make sure the FIREQ server is already running. The client connects to the server over TCP, so the server must be started first.
 
-For server-side setup and deployment details, see the server repository:
-
-- [FIREQ-Server README](https://github.com/vlsi-nanocomputing/FIREQ-Server)
+For server-side setup and deployment details, see the [server](../../FIREQ-Server/docs/index.md) documentation.
 
 The client is primarily used through an interactive command loop started by:
 
