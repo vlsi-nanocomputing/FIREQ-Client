@@ -39,14 +39,3 @@ The interactive shell provides a direct interface to control the FIREQ server, c
 | `trigger manually` | *Placeholder* | Issues an immediate manual hardware trigger request. _(Intended for future release functionality)_ |
 
 ---
-
-
-# Export workflow
-
-The client also provides an export utility that creates a reduced version of an experiment directory. The command is used as follows:
-
-```bash
-export <source_dir> <target_dir>
-```
-
-The target folder contains a compact PKL-based representation of the collected experiment data, which is useful for post-processing.

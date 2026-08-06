@@ -66,3 +66,14 @@ plotter.py plot_spectr path/to/spectr_state_0.pkl path/to/spectr_state_1.pkl
 
 - **Prerequisite:** Both target files must originate from experiments executed with the exact same sweep vector (same range, step count, and variable target).
 - **Output:** Overlays response curves for state $\vert{}0\rangle$ and state $\vert{}1\rangle$, enabling direct measurement of dispersive frequency shifts ($\chi$) or readout contrast optimization.
+
+
+### Export workflow
+
+The client also provides an export utility that creates a reduced version of an experiment directory. The command is used as follows:
+
+```bash
+export <source_dir> <target_dir>
+```
+
+The target folder contains a compact PKL-based representation of the collected experiment data, which is useful for post-processing.
