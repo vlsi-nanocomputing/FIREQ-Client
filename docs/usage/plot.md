@@ -42,9 +42,9 @@ Evaluates single-shot state classification by plotting single-point readout shot
 
 #### Usage Syntax
 
-```bash
-plotter.py plot_iq path/to/state_0.pkl path/to/state_1.pkl
-```
+    python plotter.py
+    # inside the interactive prompt:
+    plot_iq path/to/experiment_state_0/ path/to/experiment_state_1/
 
 #### Input Requirements & Characteristics
 
