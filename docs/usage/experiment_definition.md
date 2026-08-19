@@ -209,7 +209,7 @@ python run_client.py
 4. run an experiment:
 
 ```text
- run_yaml experiments/<experiment_name>.yaml
+run_yaml experiments/<experiment_name>.yaml
 ```
 
 5. wait for the acquisition to complete,
