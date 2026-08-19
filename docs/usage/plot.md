@@ -2,12 +2,12 @@
 
 ## 1. Overview of Visualization Utilities
 
-| Command | Target Data Dimensionality | Input Files | Primary Use Case |
+| Command | Target Data Dimensionality | Input | Primary Use Case |
 | :--- | :--- | :--- | :--- |
-| `plot_2d` | 1D / Multi-D (with Slicers) | Single Dataset (`.pkl`) | Standard line plots for 1D sweeps or multi-sweep data with dynamic slice controls. |
-| `plot_3d_heat` | 2D / Time-Domain Traces | Single Dataset (`.pkl`) | 2D color maps (heatmaps) for 2-variable sweeps or time-of-flight evolution over a sweep. |
-| `plot_iq` | Single-Shot IQ Cloud | Two Datasets (`.pkl`) | Complex plane scatter plots for state discrimination ($\vert{}0\rangle$ vs $\vert{}1\rangle$). |
-| `plot_spectr` | 1D Frequency / Power Sweeps | Two Datasets (`.pkl`) | Overlaid response curves comparing transmission/dispersion shifts between two states. |
+| `plot_2d` | 1D / Multi-D (with Slicers) | Experiment output directory | Standard line plots for 1D sweeps or multi-sweep data with dynamic slice controls. |
+| `plot_3d_heat` | 2D / Time-Domain Traces | Experiment output directory | 2D color maps (heatmaps) for 2-variable sweeps or time-of-flight evolution over a sweep. |
+| `plot_iq` | Single-Shot IQ Cloud | Two experiment output directories | Complex plane scatter plots for state discrimination ($\vert{}0\rangle$ vs $\vert{}1\rangle$). |
+| `plot_spectr` | 1D Frequency / Power Sweeps | Two experiment output directories | Overlaid response curves comparing transmission/dispersion shifts between two states. |
 
 ---
 
