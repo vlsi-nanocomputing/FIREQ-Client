@@ -48,8 +48,8 @@ plotter.py plot_iq path/to/state_0.pkl path/to/state_1.pkl
 
 #### Input Requirements & Characteristics
 
-- **State $\vert{}0\rangle$ File (`state_0.pkl`):** Contains $N$-shot IQ points acquired without variable sweeps while the system is prepared in state $\vert{}0\rangle$.
-- **State $\vert{}1\rangle$ File (`state_1.pkl`):** Contains $N$-shot IQ points acquired under identical hardware settings while the system is prepared in state $\vert{}1\rangle$.
+- **State $\vert{}0\rangle$ Directory (`exp_state_0/`):** Path to an experiment output folder (containing `config.json` and `data.pkl`) acquired with no variables and `$output_type: accumulated` while the system is prepared in state $\vert{}0\rangle$.
+- **State $\vert{}1\rangle$ Directory (`exp_state_1/`):** Same as above for state $\vert{}1\rangle$.
 - **Output:** A 2D scatter plot on the complex plane illustrating shot distribution, thermal noise spread, and state separation distance.
 
 ### 2.4 `plot_spectr`
