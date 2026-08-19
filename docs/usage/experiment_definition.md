@@ -206,7 +206,7 @@ python API.py
 python run_client.py
 ```
 
-4. run an experiment:
+3. run an experiment:
 
 ```text
 run_yaml experiments/<experiment_name>.yaml
