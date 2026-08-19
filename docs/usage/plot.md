@@ -56,11 +56,9 @@ Evaluates single-shot state classification by plotting single-point readout shot
 Compares spectral response curves (e.g., resonator transmission or qubit spectroscopy) between two experiment configurations.
 
 #### Usage Syntax
-Bash
-
-```
-plotter.py plot_spectr path/to/spectr_state_0.pkl path/to/spectr_state_1.pkl
-```
+    python plotter.py
+    # inside the interactive prompt:
+    plot_spectr path/to/experiment_state_0/ path/to/experiment_state_1/
 
 #### Input Requirements & Characteristics
 
