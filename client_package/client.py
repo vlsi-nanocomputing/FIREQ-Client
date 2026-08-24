@@ -61,10 +61,6 @@ class Client:
         """Connect, then enter the command loop."""
         self.connect()
         self._do_handshake()
-        nyquist = {"cmd": "set_nyquist", "tile": 228, "block_id": 0, "zone": 2}
-        self.sender.send(Message(header=nyquist))
-        nyquist = {"cmd": "set_nyquist", "tile": 229, "block_id": 0, "zone": 2}
-        self.sender.send(Message(header=nyquist))
         # Create a session with history file
         completer = make_prompt_session()
 
@@ -105,6 +101,11 @@ class Client:
             self._reset_all()
         elif command == "mts_sync":
             self._mts_sync()
+        elif command == "trigger_manually":
+            m = {"generator": "/axisGeneratorIP_0"}
+            self.sender.send(Message(header=m))
+        elif command == "set_nyquist":
+            self._set_nyquist(int(cmd_parts[1]), int(cmd_parts[2]), int(cmd_parts[3]))
         else:
             print(f"Unknown command: {command}")
     
@@ -114,6 +115,10 @@ class Client:
         self.sender.send(Message(header=ping))
         response = self.reader._queue.get()
         print("Ping response: ", response.header)
+
+    def _set_nyquist(self, tile: int, block: int, zone: int):
+        nyquist = {"cmd": "set_nyquist", "tile": tile, "block_id": block, "zone": zone}
+        self.sender.send(Message(header=nyquist))
     
     def _reset_all(self):
         # reset the state of the server
