@@ -12,13 +12,6 @@ variables:
     num: 1000
     mode: lin
 
-#variables:
-#  frequency_sweep:
-#    start: 7400
-#    stop: 7700
-#    num: 1000
-#    mode: lin
-
 sys_config:
   $shots: 1000
   /axisGeneratorIP_0:
