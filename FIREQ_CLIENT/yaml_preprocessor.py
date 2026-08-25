@@ -15,13 +15,24 @@ def resolve_placeholders(data: dict[str, Any]) -> dict[str, Any]:
     replace all "%variable_name" placeholders in sys_config (and anywhere else)
     with the actual values from 'preprocess', then return a dict containing
     only 'variables' and the resolved 'sys_config'.
+
+    :param data: raw YAML configuration.
+    :type data: dict[str, Any]
+    :return: dict with the resolved 'sys_config' and the unchanged 'variables'.
+    :rtype: dict[str, Any]
     """
     preprocess = data.get("preprocess", {})
     variables = data.get("variables", {})
     sys_config = data.get("sys_config", {})
 
     def resolve_value(value: YamlValue) -> YamlValue:
-        """Recursively replace strings starting with '%' by preprocess values."""
+        """Recursively replace strings starting with '%' by preprocess values.
+
+        :param value: value to resolve.
+        :type value: YamlValue
+        :return: the resolved value.
+        :rtype: YamlValue
+        """
         if isinstance(value, str) and value.startswith("%"):
             key = value[1:]  # strip the leading '%'
             if key in preprocess:
@@ -49,7 +60,13 @@ def resolve_placeholders(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_and_resolve(yaml_path: str) -> dict[str, Any]:
-    """Load a YAML file and resolve all '%...' placeholders."""
+    """Load a YAML file and resolve all '%...' placeholders.
+
+    :param yaml_path: path to the YAML file.
+    :type yaml_path: str
+    :return: dict with the resolved configuration.
+    :rtype: dict[str, Any]
+    """
     with open(yaml_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return resolve_placeholders(data)

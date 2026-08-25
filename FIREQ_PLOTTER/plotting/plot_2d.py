@@ -18,11 +18,25 @@ TIME_MULTIPLIER = {
 
 
 def load_dataframe(var_order: list[str], var_values_dict: dict[str, np.ndarray], exp_dir: Path) -> pd.DataFrame:
-    """Load all saved data files of an experiment and merge them into one DataFrame."""
+    """Load all saved data files of an experiment and merge them into one DataFrame.
+
+    :param var_order: names of the swept variables.
+    :type var_order: list[str]
+    :param var_values_dict: values of each swept variable.
+    :type var_values_dict: dict[str, np.ndarray]
+    :param exp_dir: experiment directory.
+    :type exp_dir: Path
+    :return: combined DataFrame indexed by the swept variables and time.
+    :rtype: pd.DataFrame
+    """
     var_checkpoint = [0] * len(var_order)
 
     def update_checkpoint() -> bool:
-        """Increment the var checkpoints; return True while more combinations remain."""
+        """Increment the var checkpoints; return True while more combinations remain.
+
+        :return: True while more combinations remain, False once all are consumed.
+        :rtype: bool
+        """
         for i in range(len(var_checkpoint)):
             var_checkpoint[i] += 1
             name = var_order[i]
@@ -33,7 +47,11 @@ def load_dataframe(var_order: list[str], var_values_dict: dict[str, np.ndarray],
         return False
 
     def filename_checkpoint() -> str:
-        """Build the data file name from the current checkpoints."""
+        """Build the data file name from the current checkpoints.
+
+        :return: file name with the checkpoint values appended.
+        :rtype: str
+        """
         name = "data"
         for n in var_checkpoint:
             name += f"_{n}"
@@ -62,7 +80,13 @@ def load_dataframe(var_order: list[str], var_values_dict: dict[str, np.ndarray],
 
 
 def load_dataframe_raw(exp_dir: Path) -> pd.DataFrame:
-    """Load the raw data.pkl file of an experiment."""
+    """Load the raw data.pkl file of an experiment.
+
+    :param exp_dir: experiment directory.
+    :type exp_dir: Path
+    :return: the raw DataFrame.
+    :rtype: pd.DataFrame
+    """
     return pd.read_pickle(f"{exp_dir}/data.pkl")
 
 
@@ -73,7 +97,19 @@ def _plot_2d(
     plot_real: bool = False,
     save: bool = False,
 ) -> None:
-    """Interactive 2D plot of the experiment data."""
+    """Interactive 2D plot of the experiment data.
+
+    :param exp_dir: experiment directory.
+    :type exp_dir: str
+    :param plot_magnitude: plot the magnitude.
+    :type plot_magnitude: bool
+    :param plot_imag: plot the imaginary part.
+    :type plot_imag: bool
+    :param plot_real: plot the real part.
+    :type plot_real: bool
+    :param save: also save the figure as a_figure.png.
+    :type save: bool
+    """
     exp_path = Path(exp_dir)
 
     # Load experiment configuration
@@ -128,11 +164,21 @@ def _plot_2d(
     sliders = {}
 
     def formatter(var: str) -> Callable[[float], str]:
-        """Return a formatter showing the variable value for a slider index."""
+        """Return a formatter showing the variable value for a slider index.
+
+        :param var: name of the variable to format.
+        :type var: str
+        :return: the formatting function.
+        :rtype: Callable[[float], str]
+        """
         return lambda x: f"{var_values[var][int(x)]:.3f}"
 
     def update(_: object = None) -> None:
-        """Redraw the plot with the current slider selections."""
+        """Redraw the plot with the current slider selections.
+
+        :param _: slider value (unused).
+        :type _: object
+        """
         df = dataframe
 
         # Apply slider selections
@@ -211,6 +257,19 @@ def _plot_3d_heatmap(
         y = variable 0
 
     Remaining variables become sliders.
+
+    :param exp_dir: experiment directory.
+    :type exp_dir: str
+    :param plot_magnitude: plot the magnitude.
+    :type plot_magnitude: bool
+    :param plot_phase: plot the phase.
+    :type plot_phase: bool
+    :param plot_real: plot the real part.
+    :type plot_real: bool
+    :param plot_imag: plot the imaginary part.
+    :type plot_imag: bool
+    :param save: also save the figure as a_figure.png.
+    :type save: bool
     """
     exp_path = Path(exp_dir)
 
@@ -273,11 +332,21 @@ def _plot_3d_heatmap(
     sliders = {}
 
     def formatter(var: str) -> Callable[[float], str]:
-        """Return a formatter showing the variable value for a slider index."""
+        """Return a formatter showing the variable value for a slider index.
+
+        :param var: name of the variable to format.
+        :type var: str
+        :return: the formatting function.
+        :rtype: Callable[[float], str]
+        """
         return lambda x: f"{var_values[var][int(x)]:.3f}"
 
     def update(_: object = None) -> None:
-        """Redraw the heatmap with the current slider selections."""
+        """Redraw the heatmap with the current slider selections.
+
+        :param _: slider value (unused).
+        :type _: object
+        """
         df = dataframe
 
         for var in slider_vars:
@@ -363,7 +432,15 @@ def _plot_3d_heatmap(
 
 
 def _plot_iq(exp_0: str, exp_1: str, save: bool = False) -> None:
-    """Plot the IQ plane of two experiments and the rotated CDF analysis."""
+    """Plot the IQ plane of two experiments and the rotated CDF analysis.
+
+    :param exp_0: directory of the first experiment.
+    :type exp_0: str
+    :param exp_1: directory of the second experiment.
+    :type exp_1: str
+    :param save: also save the figures.
+    :type save: bool
+    """
     exp_path_0 = Path(exp_0)
     exp_path_1 = Path(exp_1)
 
@@ -482,7 +559,15 @@ def _plot_iq(exp_0: str, exp_1: str, save: bool = False) -> None:
 
 
 def _plot_spectr(exp_0: str, exp_1: str, save: bool = False) -> None:
-    """Compare two spectroscopy experiments and highlight the frequency of maximal distance."""
+    """Compare two spectroscopy experiments and highlight the frequency of maximal distance.
+
+    :param exp_0: directory of the first experiment.
+    :type exp_0: str
+    :param exp_1: directory of the second experiment.
+    :type exp_1: str
+    :param save: also save the figure as a_figure.png.
+    :type save: bool
+    """
     exp_path_0 = Path(exp_0)
     exp_path_1 = Path(exp_1)
 
@@ -556,7 +641,13 @@ def _plot_spectr(exp_0: str, exp_1: str, save: bool = False) -> None:
 
 
 def export(from_dir: Path, to_dir: Path) -> None:
-    """Export an experiment (or a tree of experiments) to another directory."""
+    """Export an experiment (or a tree of experiments) to another directory.
+
+    :param from_dir: source directory.
+    :type from_dir: Path
+    :param to_dir: destination directory.
+    :type to_dir: Path
+    """
     from_dir = Path(from_dir)
     to_dir = Path(to_dir)
     if from_dir.name.startswith("experiment_") and from_dir.name != "experiment_output":
@@ -568,7 +659,13 @@ def export(from_dir: Path, to_dir: Path) -> None:
 
 
 def export_experiment(from_dir: Path, to_dir: Path) -> None:
-    """Copy one experiment directory's data and config to the destination."""
+    """Copy one experiment directory's data and config to the destination.
+
+    :param from_dir: source experiment directory.
+    :type from_dir: Path
+    :param to_dir: destination directory.
+    :type to_dir: Path
+    """
     print(f"exporting {from_dir}   to   {to_dir} ......")
     os.makedirs(to_dir)
 

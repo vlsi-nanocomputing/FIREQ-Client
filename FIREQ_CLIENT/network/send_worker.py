@@ -12,7 +12,11 @@ class SendWorker:
     """Sends framed messages via a socket using a background thread and a queue."""
 
     def __init__(self, sock: socket.socket) -> None:
-        """Initialize the sender with the socket and a background thread."""
+        """Initialize the sender with the socket and a background thread.
+
+        :param sock: the socket used to send messages.
+        :type sock: socket.socket
+        """
         self._sock = sock
         self._queue = queue.Queue()
         self._stop_event = threading.Event()
@@ -23,7 +27,11 @@ class SendWorker:
         self._thread.start()
 
     def stop(self, timeout: float | None = None) -> None:
-        """Stop the sending thread and close the socket."""
+        """Stop the sending thread and close the socket.
+
+        :param timeout: how long to wait for the thread to stop.
+        :type timeout: float | None
+        """
         self._stop_event.set()
         # Unblock the queue by pushing a sentinel (optional) or close socket
         try:
@@ -34,7 +42,11 @@ class SendWorker:
         self._thread.join(timeout)
 
     def send(self, message: Message) -> None:
-        """Enqueue a message to be sent by the background thread."""
+        """Enqueue a message to be sent by the background thread.
+
+        :param message: the message to enqueue.
+        :type message: Message
+        """
         self._queue.put(message)
 
     def _sender_loop(self) -> None:

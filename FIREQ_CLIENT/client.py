@@ -27,7 +27,13 @@ class Client:
     """Interactive client for the FIREQ server."""
 
     def __init__(self, host: str, port: int) -> None:
-        """Initialize the client with the server address."""
+        """Initialize the client with the server address.
+
+        :param host: server hostname or IP address.
+        :type host: str
+        :param port: server TCP port.
+        :type port: int
+        """
         self.host = host
         self.port = port
         self.log = logging.getLogger(__name__)
@@ -90,7 +96,11 @@ class Client:
         self.log.info("Handshake completed.")
 
     def _dispatch_command(self, cmd: str) -> None:
-        """Process a user command."""
+        """Process a user command.
+
+        :param cmd: command line entered by the user.
+        :type cmd: str
+        """
         cmd_parts = shlex.split(cmd)
         command = cmd_parts[0]
         if command == "ping":
@@ -118,7 +128,15 @@ class Client:
         print("Ping response: ", response.header)
 
     def _set_nyquist(self, tile: int, block: int, zone: int) -> None:
-        """Set the Nyquist zone on the given tile, block and zone."""
+        """Set the Nyquist zone on the given tile, block and zone.
+
+        :param tile: tile index.
+        :type tile: int
+        :param block: block index.
+        :type block: int
+        :param zone: zone index.
+        :type zone: int
+        """
         nyquist = {"cmd": "set_nyquist", "tile": tile, "block_id": block, "zone": zone}
         self.sender.send(Message(header=nyquist))
 
@@ -130,7 +148,11 @@ class Client:
         print("Reset all response: ", response.header)
 
     def _run_yaml(self, yaml_file: str) -> None:
-        """Load a YAML file and run the experiment it describes."""
+        """Load a YAML file and run the experiment it describes.
+
+        :param yaml_file: path to the YAML configuration file.
+        :type yaml_file: str
+        """
         # load and preprocess the file
         config = load_and_resolve(yaml_file)
         # check for the existance of keys
@@ -160,7 +182,13 @@ class Client:
 
     # ------------------------------------------------------------------
     def _fetch_without_variables(self, config: dict, experiment_name: str) -> None:
-        """Fetch and save the data of a single (non-swept) experiment."""
+        """Fetch and save the data of a single (non-swept) experiment.
+
+        :param config: resolved YAML configuration.
+        :type config: dict
+        :param experiment_name: name used for the output folder.
+        :type experiment_name: str
+        """
         shots = config["sys_config"]["$shots"]
         try:
             self._wait_for_experiment_start()
@@ -174,7 +202,15 @@ class Client:
             self.log.error(f"Failed to run experiment {e}")
 
     def _fetch_shots(self, shots: int, leave_bar: bool = True) -> tuple[str, np.ndarray]:
-        """Fetch a single experiment (no sweep). Data may arrive in several DMA packages."""
+        """Fetch a single experiment (no sweep). Data may arrive in several DMA packages.
+
+        :param shots: number of shots to fetch.
+        :type shots: int
+        :param leave_bar: keep the progress bar after completion.
+        :type leave_bar: bool
+        :return: the source name and the concatenated shot data.
+        :rtype: tuple[str, np.ndarray]
+        """
         # NOTE: IT ONLY SUPPORTS A SINGLE SOURCE FOR NOW
         collected_data = []
         collected_shots = 0
@@ -197,7 +233,17 @@ class Client:
 
     @staticmethod
     def _make_df_from_shots(array: np.ndarray, mode: str, shots: int) -> pd.DataFrame:
-        """Turn the shot array into a DataFrame indexed by shot and time."""
+        """Turn the shot array into a DataFrame indexed by shot and time.
+
+        :param array: raw shot samples.
+        :type array: np.ndarray
+        :param mode: output mode ("raw", "decimated" or accumulated).
+        :type mode: str
+        :param shots: number of shots in the array.
+        :type shots: int
+        :return: DataFrame with "shot" and "time" index levels and a "value" column.
+        :rtype: pd.DataFrame
+        """
         if mode in ("raw", "decimated"):
             # split the array into shots equal pieces, make the dataframe with the time axis
             total = len(array)
@@ -220,7 +266,13 @@ class Client:
 
     # ------------------------------------------------------------------
     def _fetch_with_variables(self, config: dict, experiment_name: str) -> None:
-        """Fetch a swept experiment with multiple variable combinations."""
+        """Fetch a swept experiment with multiple variable combinations.
+
+        :param config: resolved YAML configuration.
+        :type config: dict
+        :param experiment_name: name used for the output folder.
+        :type experiment_name: str
+        """
         sys_config = config["sys_config"]
         shots = sys_config["$shots"]
         variable_specs = config["variables"]  # dict: name -> {start, end, num, mode}
@@ -257,7 +309,13 @@ class Client:
                     return
 
         def make_filename(start: str) -> str:
-            """Build the output file name from the current checkpoints."""
+            """Build the output file name from the current checkpoints.
+
+            :param start: base name of the file.
+            :type start: str
+            :return: file name with the checkpoint values appended.
+            :rtype: str
+            """
             name = start
             for var in var_order:
                 check = variable_checkpoint[var]["checkpoint"]
@@ -288,7 +346,11 @@ class Client:
     # Helper methods
     # ------------------------------------------------------------------
     def _wait_for_variable_order(self) -> list[str]:
-        """Read the queue until we get the sweep_experiment_header."""
+        """Read the queue until we get the sweep_experiment_header.
+
+        :return: list of variable names in the order used by the server.
+        :rtype: list[str]
+        """
         while True:
             response = self.reader._queue.get()
             typeh = response.header.get("type")
@@ -309,7 +371,11 @@ class Client:
                 raise Exception(f"Got unexpected message from server: {response.header}")
 
     def _wait_for_experiment_stop(self) -> Message:
-        """Read the queue until the server reports the experiment stop."""
+        """Read the queue until the server reports the experiment stop.
+
+        :return: the status message.
+        :rtype: Message
+        """
         while True:
             response = self.reader._queue.get()
             typeh = response.header.get("type")
@@ -319,7 +385,11 @@ class Client:
                 raise Exception(f"Got unexpected message from server: {response.header}")
 
     def _wait_for_next_dma(self) -> Message:
-        """Read the queue until we get a DMA package."""
+        """Read the queue until we get a DMA package.
+
+        :return: the DMA package message.
+        :rtype: Message
+        """
         while True:
             response = self.reader._queue.get()
             typeh = response.header.get("type")
@@ -329,7 +399,13 @@ class Client:
                 raise Exception(f"Got unexpected message from server: {response.header}")
 
     def _decode_package(self, package: Message) -> np.ndarray:
-        """Decode the payload of a DMA package into complex IQ samples."""
+        """Decode the payload of a DMA package into complex IQ samples.
+
+        :param package: the DMA package to decode.
+        :type package: Message
+        :return: complex IQ samples.
+        :rtype: np.ndarray
+        """
         # get dtype, sent over msgpack so it is made of lists
         dt = package.header.get("format")
         dt = [(name, fmt) for name, fmt in dt]
@@ -338,7 +414,15 @@ class Client:
         return arr["real"] + 1.0j * arr["imag"]
 
     def _make_experiment_folder(self, experiment_name: str, config: dict) -> str:
-        """Create a timestamped experiment directory and save the config in it."""
+        """Create a timestamped experiment directory and save the config in it.
+
+        :param experiment_name: name of the experiment.
+        :type experiment_name: str
+        :param config: experiment configuration to save as config.json.
+        :type config: dict
+        :return: path of the created directory.
+        :rtype: str
+        """
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         dir_name = f"experiment_output/{experiment_name}/experiment_{timestamp}"
         os.makedirs(dir_name, exist_ok=False)
@@ -347,7 +431,15 @@ class Client:
         return dir_name
 
     def _save_experiment(self, df: pd.DataFrame, dir_name: str, end_message: Message) -> None:
-        """Save the experiment data (CSV + pickle) and the end message."""
+        """Save the experiment data (CSV + pickle) and the end message.
+
+        :param df: experiment data to save.
+        :type df: pd.DataFrame
+        :param dir_name: experiment directory.
+        :type dir_name: str
+        :param end_message: server message with the experiment summary.
+        :type end_message: Message
+        """
         # Save DataFrame (can use Parquet or HDF5 for efficiency)
         df.to_csv(os.path.join(dir_name, "data.csv"), encoding='utf-8')
         df.to_pickle(os.path.join(dir_name, "data.pkl"))
@@ -355,12 +447,28 @@ class Client:
             json.dump(end_message.header, f, indent=2, default=str)
 
     def _save_dict(self, d: dict, dir_name: str, file_name: str) -> None:
-        """Save a dict as JSON in the experiment directory."""
+        """Save a dict as JSON in the experiment directory.
+
+        :param d: dict to save.
+        :type d: dict
+        :param dir_name: experiment directory.
+        :type dir_name: str
+        :param file_name: name of the JSON file (without extension).
+        :type file_name: str
+        """
         with open(os.path.join(dir_name, f"{file_name}.json"), "w") as f:
             json.dump(d, f, indent=2, default=str)
 
     def _save_dataframe(self, df: pd.DataFrame, dir_name: str, file_name: str) -> None:
-        """Save a DataFrame as CSV and pickle in the experiment directory."""
+        """Save a DataFrame as CSV and pickle in the experiment directory.
+
+        :param df: data to save.
+        :type df: pd.DataFrame
+        :param dir_name: experiment directory.
+        :type dir_name: str
+        :param file_name: base name of the output files (without extension).
+        :type file_name: str
+        """
         # Save DataFrame (can use Parquet or HDF5 for efficiency)
         df.to_csv(os.path.join(dir_name, f"{file_name}.csv"), encoding='utf-8')
         df.to_pickle(os.path.join(dir_name, f"{file_name}.pkl"))

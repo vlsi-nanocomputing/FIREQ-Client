@@ -20,7 +20,15 @@ class CommandCompleter(Completer):
         self.path_completer = PathCompleter(expanduser=True)
 
     def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
-        """Yield command completions, or path completions for 'run_yaml'."""
+        """Yield command completions, or path completions for 'run_yaml'.
+
+        :param document: the current prompt document.
+        :type document: Document
+        :param complete_event: the completion event.
+        :type complete_event: CompleteEvent
+        :return: the completion suggestions.
+        :rtype: Iterable[Completion]
+        """
         text = document.text_before_cursor.lstrip()
         if text.startswith("run_yaml "):
             # Use path completer for the part after command
@@ -35,7 +43,11 @@ class CommandCompleter(Completer):
 
 
 def make_prompt_session() -> PromptSession[str]:
-    """Create a PromptSession with history, completion and auto-suggestion."""
+    """Create a PromptSession with history, completion and auto-suggestion.
+
+    :return: the configured prompt session.
+    :rtype: PromptSession[str]
+    """
     history_file = os.path.expanduser("~/.fireq_client_history")
     return PromptSession(
         history=FileHistory(history_file),

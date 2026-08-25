@@ -42,7 +42,15 @@ class CommandCompleter(Completer):
         )
 
     def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
-        """Yield completions for the command or for the argument being typed."""
+        """Yield completions for the command or for the argument being typed.
+
+        :param document: the current prompt document.
+        :type document: Document
+        :param complete_event: the completion event.
+        :type complete_event: CompleteEvent
+        :return: the completion suggestions.
+        :rtype: Iterable[Completion]
+        """
         # text before the cursor
         text_before = document.text_before_cursor
         # text split
