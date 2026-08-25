@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from .export import export
 from .network import Message, ReceiveWorker, SendWorker
 from .prompt_completer import make_prompt_session
 from .yaml_preprocessor import load_and_resolve
@@ -117,6 +118,11 @@ class Client:
             self.sender.send(Message(header=m))
         elif command == "set_nyquist":
             self._set_nyquist(int(cmd_parts[1]), int(cmd_parts[2]), int(cmd_parts[3]))
+        elif command == "export":
+            if len(cmd_parts) < 3:
+                print("command must contain a from and to directory")
+            else:
+                self._export(cmd_parts[1], cmd_parts[2])
         else:
             print(f"Unknown command: {command}")
 
@@ -179,6 +185,16 @@ class Client:
     def _mts_sync(self) -> None:
         """Send the mts_sync command to the server."""
         self.sender.send(Message(header={"cmd": "mts_sync"}))
+
+    def _export(self, from_dir: str, to_dir: str) -> None:
+        """Export an experiment (or a tree of experiments) to another directory.
+
+        :param from_dir: source directory.
+        :type from_dir: str
+        :param to_dir: destination directory.
+        :type to_dir: str
+        """
+        export(from_dir, to_dir)
 
     # ------------------------------------------------------------------
     def _fetch_without_variables(self, config: dict, experiment_name: str) -> None:
@@ -431,7 +447,7 @@ class Client:
         return dir_name
 
     def _save_experiment(self, df: pd.DataFrame, dir_name: str, end_message: Message) -> None:
-        """Save the experiment data (CSV + pickle) and the end message.
+        """Save the experiment data (pickle) and the end message.
 
         :param df: experiment data to save.
         :type df: pd.DataFrame
@@ -441,7 +457,6 @@ class Client:
         :type end_message: Message
         """
         # Save DataFrame (can use Parquet or HDF5 for efficiency)
-        df.to_csv(os.path.join(dir_name, "data.csv"), encoding='utf-8')
         df.to_pickle(os.path.join(dir_name, "data.pkl"))
         with open(os.path.join(dir_name, "end_message.json"), "w") as f:
             json.dump(end_message.header, f, indent=2, default=str)
@@ -460,15 +475,14 @@ class Client:
             json.dump(d, f, indent=2, default=str)
 
     def _save_dataframe(self, df: pd.DataFrame, dir_name: str, file_name: str) -> None:
-        """Save a DataFrame as CSV and pickle in the experiment directory.
+        """Save a DataFrame as pickle in the experiment directory.
 
         :param df: data to save.
         :type df: pd.DataFrame
         :param dir_name: experiment directory.
         :type dir_name: str
-        :param file_name: base name of the output files (without extension).
+        :param file_name: name of the pickle file (without extension).
         :type file_name: str
         """
         # Save DataFrame (can use Parquet or HDF5 for efficiency)
-        df.to_csv(os.path.join(dir_name, f"{file_name}.csv"), encoding='utf-8')
         df.to_pickle(os.path.join(dir_name, f"{file_name}.pkl"))

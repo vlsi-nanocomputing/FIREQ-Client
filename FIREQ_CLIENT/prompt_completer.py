@@ -16,7 +16,10 @@ class CommandCompleter(Completer):
 
     def __init__(self) -> None:
         """Initialize the command and path completers."""
-        self.commands = WordCompleter(['ping', 'run_yaml', 'reset_all', 'mts_sync', 'quit', 'exit'], ignore_case=True)
+        self.commands = WordCompleter(
+            ['ping', 'run_yaml', 'reset_all', 'mts_sync', 'set_nyquist', 'trigger_manually', 'export', 'quit', 'exit'],
+            ignore_case=True,
+        )
         self.path_completer = PathCompleter(expanduser=True)
 
     def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
