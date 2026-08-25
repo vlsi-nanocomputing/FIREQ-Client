@@ -1,44 +1,48 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
-from pathlib import Path
+"""2D plotting functions for FIREQ experiment data."""
+
 import json
-import pandas as pd
 import os
 import shutil
-from matplotlib.colors import Normalize
+from collections.abc import Callable
+from pathlib import Path
 
-TIME_MULTIPLIER ={
-    "raw" : 0.4283168859,
-    "decimated": 1.7132675438
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.widgets import Slider
+
+TIME_MULTIPLIER = {
+    "raw": 0.4283168859,
+    "decimated": 1.7132675438,
 }
 
 
+def load_dataframe(var_order: list[str], var_values_dict: dict[str, np.ndarray], exp_dir: Path) -> pd.DataFrame:
+    """Load all saved data files of an experiment and merge them into one DataFrame."""
+    var_checkpoint = [0] * len(var_order)
 
-def load_dataframe(var_order, var_values_dict, exp_dir) -> pd.DataFrame:
-    
-    var_checkpoint = [0]*len(var_order)
-    def update_checkpoint():
+    def update_checkpoint() -> bool:
+        """Increment the var checkpoints; return True while more combinations remain."""
         for i in range(len(var_checkpoint)):
-            var_checkpoint[i] +=1
+            var_checkpoint[i] += 1
             name = var_order[i]
             if var_checkpoint[i] == len(var_values_dict[name]):
                 var_checkpoint[i] = 0
             else:
                 return True
         return False
-    
-    def filename_checkpoint():
+
+    def filename_checkpoint() -> str:
+        """Build the data file name from the current checkpoints."""
         name = "data"
         for n in var_checkpoint:
             name += f"_{n}"
         return name
-    
-    load_data = True
-    frames = []          # list of averaged DataFrames
-    configs = []      # list of configuration tuples
 
     load_data = True
+    frames = []  # list of averaged DataFrames
+    configs = []  # list of configuration tuples
+
     while load_data:
         frame_name = filename_checkpoint()
         frame_df = pd.read_pickle(f"{exp_dir}/{frame_name}.pkl")
@@ -56,7 +60,9 @@ def load_dataframe(var_order, var_values_dict, exp_dir) -> pd.DataFrame:
     # Now build the master DataFrame
     return pd.concat(frames, keys=configs, names=var_order)
 
-def load_dataframe_raw(exp_dir):
+
+def load_dataframe_raw(exp_dir: Path) -> pd.DataFrame:
+    """Load the raw data.pkl file of an experiment."""
     return pd.read_pickle(f"{exp_dir}/data.pkl")
 
 
@@ -65,10 +71,9 @@ def _plot_2d(
     plot_magnitude: bool = True,
     plot_imag: bool = False,
     plot_real: bool = False,
-    save: bool = False
+    save: bool = False,
 ) -> None:
     """Interactive 2D plot of the experiment data."""
-
     exp_path = Path(exp_dir)
 
     # Load experiment configuration
@@ -122,11 +127,12 @@ def _plot_2d(
 
     sliders = {}
 
-    def formatter(var):
+    def formatter(var: str) -> Callable[[float], str]:
+        """Return a formatter showing the variable value for a slider index."""
         return lambda x: f"{var_values[var][int(x)]:.3f}"
 
-    def update(_=None):
-
+    def update(_: object = None) -> None:
+        """Redraw the plot with the current slider selections."""
         df = dataframe
 
         # Apply slider selections
@@ -138,7 +144,6 @@ def _plot_2d(
             return
 
         if output_type in ("raw", "decimated"):
-
             x = (
                 df.index.get_level_values("time").to_numpy()
                 * TIME_MULTIPLIER[output_type]
@@ -148,7 +153,6 @@ def _plot_2d(
         else:
             # REAL sweep values instead of integer indices
             x = var_values[var_names[0]]
-
             y = df["value"].to_numpy()
 
         if "real" in lines:
@@ -167,7 +171,6 @@ def _plot_2d(
     bottom = 0.08
 
     for i, var in enumerate(slider_vars):
-
         sax = plt.axes([0.15, bottom + i * 0.05, 0.7, 0.03])
 
         sliders[var] = Slider(
@@ -187,14 +190,15 @@ def _plot_2d(
         plt.savefig(exp_path / "a_figure.png")
     plt.show()
 
+
 def _plot_3d_heatmap(
     exp_dir: str,
     plot_magnitude: bool = True,
     plot_phase: bool = False,
     plot_real: bool = False,
     plot_imag: bool = False,
-    save: bool = False
-):
+    save: bool = False,
+) -> None:
     """
     Interactive heatmap.
 
@@ -208,7 +212,6 @@ def _plot_3d_heatmap(
 
     Remaining variables become sliders.
     """
-
     exp_path = Path(exp_dir)
 
     with open(exp_path / "config.json") as f:
@@ -269,25 +272,22 @@ def _plot_3d_heatmap(
 
     sliders = {}
 
-    def formatter(var):
+    def formatter(var: str) -> Callable[[float], str]:
+        """Return a formatter showing the variable value for a slider index."""
         return lambda x: f"{var_values[var][int(x)]:.3f}"
 
-    current = {v: 0 for v in slider_vars}
-
-    def update(_=None):
-
+    def update(_: object = None) -> None:
+        """Redraw the heatmap with the current slider selections."""
         df = dataframe
 
         for var in slider_vars:
             idx = int(sliders[var].val)
-            current[var] = idx
             df = df[df.index.get_level_values(var) == idx]
 
         if df.empty:
             return
 
         if output_type in ("raw", "decimated"):
-
             heat = (
                 df["value"]
                 .unstack("time")
@@ -298,7 +298,6 @@ def _plot_3d_heatmap(
             y = var_values[y_name]
 
         else:
-
             heat = (
                 df["value"]
                 .droplevel("time")
@@ -343,7 +342,6 @@ def _plot_3d_heatmap(
     bottom = 0.08
 
     for i, var in enumerate(slider_vars):
-
         sax = plt.axes([0.15, bottom + i * 0.05, 0.7, 0.03])
 
         sliders[var] = Slider(
@@ -363,7 +361,9 @@ def _plot_3d_heatmap(
         plt.savefig(exp_path / "a_figure.png")
     plt.show()
 
-def _plot_iq(exp_0, exp_1, save=False):
+
+def _plot_iq(exp_0: str, exp_1: str, save: bool = False) -> None:
+    """Plot the IQ plane of two experiments and the rotated CDF analysis."""
     exp_path_0 = Path(exp_0)
     exp_path_1 = Path(exp_1)
 
@@ -376,19 +376,14 @@ def _plot_iq(exp_0, exp_1, save=False):
     for config in [config_0, config_1]:
         if config["variables"] or config["sys_config"]["/axisAcquisitionIP_0"]["$output_type"] != "accumulated":
             print("Experiment config contains variables or the value is not accumulated")
-            return 
-    
+            return
+
     # load dataframes
     df_0 = load_dataframe_raw(exp_path_0)
     df_1 = load_dataframe_raw(exp_path_1)
 
-    # take a training dataset which is half the size of the data and 
-    # use it to train a linear separation
-    #sample_s = df_0["value"].sample(frac=1, random_state=42)
-    #mask = df_0["value"].index.isin(sample_s.index)
-    #series_mask = pd.Series(mask, index=df_0["value"].index)
-    iq_0 : np.ndarray = df_0["value"].to_numpy()
-    iq_1 : np.ndarray = df_1["value"].to_numpy()
+    iq_0: np.ndarray = df_0["value"].to_numpy()
+    iq_1: np.ndarray = df_1["value"].to_numpy()
     plt.scatter(iq_0.real, iq_0.imag, s=5)
     plt.scatter(iq_1.real, iq_1.imag, s=5)
     if save:
@@ -403,13 +398,11 @@ def _plot_iq(exp_0, exp_1, save=False):
     mid_point = (mean_0 + mean_1) / 2
 
     # rotate around the middle point and move back
-    # Calcoliamo l'angolo della retta che unisce i due punti medi
     angle = np.angle(mean_1 - mean_0)
 
-    # Ruotiamo i dati portando la retta di giunzione parallela all'asse X
-    # Usiamo i numeri complessi: (z - centro) * e^(-i * angle) + centro
-    iq_0_rot : np.ndarray = (iq_0 - mid_point) * np.exp(-1j * angle) + mid_point
-    iq_1_rot : np.ndarray = (iq_1 - mid_point) * np.exp(-1j * angle) + mid_point
+    # Rotate the data so that the line joining the two means is parallel to the X axis
+    iq_0_rot: np.ndarray = (iq_0 - mid_point) * np.exp(-1j * angle) + mid_point
+    iq_1_rot: np.ndarray = (iq_1 - mid_point) * np.exp(-1j * angle) + mid_point
 
     mean_0_rot = (mean_0 - mid_point) * np.exp(-1j * angle) + mid_point
     mean_1_rot = (mean_1 - mid_point) * np.exp(-1j * angle) + mid_point
@@ -419,22 +412,29 @@ def _plot_iq(exp_0, exp_1, save=False):
     plt.subplot(1, 2, 1)
     plt.scatter(iq_0_rot.real, iq_0_rot.imag, s=5, alpha=0.5, label='Rotated 0')
     plt.scatter(iq_1_rot.real, iq_1_rot.imag, s=5, alpha=0.5, label='Rotated 1')
-    plt.plot([mean_0_rot.real, mean_1_rot.real], [mean_0_rot.imag, mean_1_rot.imag], color='red', marker='o', label='Means Line')
+    plt.plot(
+        [mean_0_rot.real, mean_1_rot.real],
+        [mean_0_rot.imag, mean_1_rot.imag],
+        color='red',
+        marker='o',
+        label='Means Line',
+    )
     plt.title("Rotated IQ Plane")
     plt.xlabel("I (Real)")
     plt.ylabel("Q (Imag)")
     plt.legend()
     plt.grid(True)
 
-    # consider only the values on the x axis, create cumulative distribution for both, plot the two cumulative distributions
+    # consider only the values on the x axis, create cumulative distribution
+    # for both, plot the two cumulative distributions
     plt.subplot(1, 2, 2)
-    # Estraiamo solo la componente X (reale) dopo la rotazione
+    # Take only the X (real) component after the rotation
     x_0 = iq_0_rot.real
     x_1 = iq_1_rot.real
 
     # get the limits of the plot
-    x_max = max(x_0.max(),x_1.max())
-    x_min = min(x_0.min(),x_1.min())
+    x_max = max(x_0.max(), x_1.max())
+    x_min = min(x_0.min(), x_1.min())
 
     # create a linspace for the x axis of the CDF
     # 1. Sort your input arrays first (required for searchsorted)
@@ -454,36 +454,35 @@ def _plot_iq(exp_0, exp_1, save=False):
 
     # find where the two distances are maximized
     x_cdf_abs_diff = np.abs(x_0_cdf - x_1_cdf)
-    treshold = np.argmax(x_cdf_abs_diff)
-    fidelity = x_cdf_abs_diff[treshold]
+    threshold = np.argmax(x_cdf_abs_diff)
+    fidelity = x_cdf_abs_diff[threshold]
 
-    print(f"maximum fidelity with treshold: {treshold} is equal to: {fidelity:.2f}%")
+    print(f"maximum fidelity with threshold: {threshold} is equal to: {fidelity:.2f}%")
 
-    # Generiamo le distribuzioni cumulative (CDF)
+    # Plot the two cumulative distributions (CDF)
     plt.plot(x_cdf, x_0_cdf, label='CDF 0', linewidth=1.5)
     plt.plot(x_cdf, x_1_cdf, label='CDF 1', linewidth=1.5)
-    plt.plot([x_cdf[treshold]]*2, [x_0_cdf[treshold], x_1_cdf[treshold]], color='red', marker='o', label=f"Point of maximum fidelity: {fidelity:.2f}%")
+    plt.plot(
+        [x_cdf[threshold]] * 2,
+        [x_0_cdf[threshold], x_1_cdf[threshold]],
+        color='red',
+        marker='o',
+        label=f"Point of maximum fidelity: {fidelity:.2f}%",
+    )
     plt.title("Cumulative Distribution (X-axis)")
     plt.xlabel("Projected X value")
     plt.ylabel("Probability")
     plt.legend()
     plt.grid(True)
-    
+
     plt.tight_layout()
     if save:
         plt.savefig(exp_path_0 / "rotated_analysis.png")
     plt.show()
-    plt.clf()
 
-    # find the middle point between the two means
 
-    # rotate around the middle point and move back
-
-    # plot a scatter to show the data, show the two means and a line connecting them
-
-    # consider only the values on the x axis, create comulative distribution for both, plot the two comulative distributions
-
-def _plot_spectr(exp_0, exp_1, save=False):
+def _plot_spectr(exp_0: str, exp_1: str, save: bool = False) -> None:
+    """Compare two spectroscopy experiments and highlight the frequency of maximal distance."""
     exp_path_0 = Path(exp_0)
     exp_path_1 = Path(exp_1)
 
@@ -496,14 +495,14 @@ def _plot_spectr(exp_0, exp_1, save=False):
         var_order_0 = json.load(f)
     with open(exp_path_1 / "var_order.json") as f:
         var_order_1 = json.load(f)
-    
+
     if var_order_1 != var_order_0 or config_0["variables"] != config_1["variables"]:
         print("error, mismatch in variable configuration or var order")
-    
+
     for config in [config_0, config_1]:
         if config["sys_config"]["/axisAcquisitionIP_0"]["$output_type"] != "accumulated":
             print("Experiment config contains variables or the value is not accumulated")
-            return 
+            return
 
     var_names = [var_order_0[str(i)] for i in range(len(var_order_0))]
     var_values = {
@@ -520,13 +519,13 @@ def _plot_spectr(exp_0, exp_1, save=False):
     df_1 = load_dataframe(var_names, var_values, exp_path_1)
 
     # take the values
-    iq_0 : np.ndarray = df_0["value"].to_numpy()
-    iq_1 : np.ndarray = df_1["value"].to_numpy()
+    iq_0: np.ndarray = df_0["value"].to_numpy()
+    iq_1: np.ndarray = df_1["value"].to_numpy()
 
     # compute the point by point distance, take the maximum
     iq_distance = np.abs(iq_0 - iq_1)
     maxarg = np.argmax(iq_distance)
-    
+
     plt.figure(figsize=(10, 5))
     plt.subplot(1, 2, 1)
     plt.scatter(iq_0.real, iq_0.imag, s=5)
@@ -534,7 +533,13 @@ def _plot_spectr(exp_0, exp_1, save=False):
     # plot the point with maximum distance
     frequency = var_values[var_names[0]]
     best_f = frequency[maxarg]
-    plt.plot([iq_0[maxarg].real, iq_1[maxarg].real], [iq_0[maxarg].imag, iq_1[maxarg].imag], color='red', marker='o', label=f"Frequency of maximal distance: {best_f:.4f}")
+    plt.plot(
+        [iq_0[maxarg].real, iq_1[maxarg].real],
+        [iq_0[maxarg].imag, iq_1[maxarg].imag],
+        color='red',
+        marker='o',
+        label=f"Frequency of maximal distance: {best_f:.4f}",
+    )
     plt.title("Spectroscopy based frequency optimization")
     plt.xlabel("I values")
     plt.ylabel("Q values")
@@ -542,18 +547,16 @@ def _plot_spectr(exp_0, exp_1, save=False):
 
     # plot the two spectroscopies
     plt.subplot(1, 2, 2)
-    plt.plot(frequency, np.abs(iq_0), label= "Response at 0")
-    plt.plot(frequency, np.abs(iq_1), label= "Response at 1")
-    #plt.hlines(frequency[maxarg],0,max(np.abs(iq_0).max(), np.abs(iq_1).max()))
+    plt.plot(frequency, np.abs(iq_0), label="Response at 0")
+    plt.plot(frequency, np.abs(iq_1), label="Response at 1")
     plt.tight_layout()
     if save:
         plt.savefig(exp_path_0 / "a_figure.png")
     plt.show()
 
 
-
-
-def export(from_dir, to_dir: Path):
+def export(from_dir: Path, to_dir: Path) -> None:
+    """Export an experiment (or a tree of experiments) to another directory."""
     from_dir = Path(from_dir)
     to_dir = Path(to_dir)
     if from_dir.name.startswith("experiment_") and from_dir.name != "experiment_output":
@@ -563,7 +566,9 @@ def export(from_dir, to_dir: Path):
             if dir.is_dir():
                 export(dir, to_dir / dir.name)
 
-def export_experiment(from_dir: Path, to_dir: Path):
+
+def export_experiment(from_dir: Path, to_dir: Path) -> None:
+    """Copy one experiment directory's data and config to the destination."""
     print(f"exporting {from_dir}   to   {to_dir} ......")
     os.makedirs(to_dir)
 
@@ -604,4 +609,3 @@ def export_experiment(from_dir: Path, to_dir: Path):
         shutil.copy(from_dir / "end_message.json", to_dir / "end_message.json")
     if os.path.exists(from_dir / "a_figure.png"):
         shutil.copy(from_dir / "a_figure.png", to_dir / "a_figure.png")
-    

@@ -1,5 +1,7 @@
+"""Entry point for the FIREQ client."""
 
-from client_package.client import Client
+from FIREQ_CLIENT.client import Client
+
 SERVER_IP = "vlsi-zcu216.polito.it"
 SERVER_PORT = 9091
 

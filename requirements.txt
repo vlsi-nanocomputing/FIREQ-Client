@@ -1,6 +1,6 @@
-matplotlib==3.6.3
-msgpack_python==0.5.6
-numpy==2.5.1
+matplotlib==3.11.0
+msgpack==1.2.1
+numpy==1.26.4
 pandas==3.0.3
 prompt_toolkit==3.0.52
 PyYAML==6.0.3

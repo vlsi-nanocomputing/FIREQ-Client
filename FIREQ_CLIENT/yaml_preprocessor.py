@@ -1,8 +1,16 @@
-import yaml
-from typing import Any, Dict
+"""Preprocessing of experiment YAML configuration files."""
 
-def resolve_placeholders(data: Dict[str, Any]) -> Dict[str, Any]:
-    """
+from typing import Any, TypeAlias
+
+import yaml
+
+# A value coming from (or resolved in) a YAML file.
+YamlValue: TypeAlias = str | int | float | bool | None | list["YamlValue"] | dict[str, "YamlValue"]
+
+
+def resolve_placeholders(data: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the placeholders in a YAML config dict.
+
     Given a dict with keys 'preprocess', 'variables', 'sys_config',
     replace all "%variable_name" placeholders in sys_config (and anywhere else)
     with the actual values from 'preprocess', then return a dict containing
@@ -12,7 +20,7 @@ def resolve_placeholders(data: Dict[str, Any]) -> Dict[str, Any]:
     variables = data.get("variables", {})
     sys_config = data.get("sys_config", {})
 
-    def resolve_value(value: Any) -> Any:
+    def resolve_value(value: YamlValue) -> YamlValue:
         """Recursively replace strings starting with '%' by preprocess values."""
         if isinstance(value, str) and value.startswith("%"):
             key = value[1:]  # strip the leading '%'
@@ -40,8 +48,8 @@ def resolve_placeholders(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def load_and_resolve(yaml_path: str) -> Dict[str, Any]:
+def load_and_resolve(yaml_path: str) -> dict[str, Any]:
     """Load a YAML file and resolve all '%...' placeholders."""
-    with open(yaml_path, "r", encoding="utf-8") as f:
+    with open(yaml_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return resolve_placeholders(data)

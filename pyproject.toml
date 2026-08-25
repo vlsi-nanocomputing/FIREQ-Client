@@ -2,20 +2,32 @@
 # This file centralizes project metadata and tool configuration.
 # It allows the whole team (PyCharm, VS Code, CI) to use the same rules.
 
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 # Project metadata (used by packaging/build tools and some IDEs)
-name = "fireq-server"
+name = "fireq-client"
 version = "0.1.0"
-requires-python = "==3.10.*"
+requires-python = ">=3.10"
 
-# Dependencies
+# Runtime dependencies, aligned with requirements.txt
 dependencies = [
+  "matplotlib==3.11.0",
+  "msgpack==1.2.1",
+  "numpy==1.26.4",
+  "pandas==3.0.3",
+  "prompt_toolkit==3.0.52",
+  "PyYAML==6.0.3",
+  "tqdm==4.67.3",
+]
+
+[project.optional-dependencies]
+# Development tools
+dev = [
   "black>=25.12.0",
   "ruff>=0.14.11",
-  "pre-commit>=4.5.1",
-  "numpy>=1.21.0,<2.0",
-  "pynq>=3.0.0",
-  "pytest>=7.0.0",
 ]
 
 [tool.black]
@@ -52,17 +64,10 @@ exclude = [
 select = ["E", "F", "I", "UP", "B", "D", "ANN", "PL"]
 
 ignore = [
-    "ISC001",
     "PLR09",
     "PLR2004",
-    "S101",
 ]
 future-annotations = true
-
-[tool.ruff.lint.per-file-ignores]
-# Relax rules in specific contexts
-"test/**" = ["D", "ANN", "S101", "T20"]
-#"docs/**" = ["D"]
 
 [tool.ruff.format]
 docstring-code-format = true
