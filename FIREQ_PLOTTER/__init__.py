@@ -1,0 +1,1 @@
+"""FIREQ plotter package."""
