@@ -23,6 +23,7 @@ from .yaml_preprocessor import load_and_resolve
 AUTH_TOKEN = "fireq"
 CLIENT_NAME = "minimal_client"
 
+
 # ─── Client ───────────────────────────────────────────────────────
 class Client:
     """Interactive client for the FIREQ server."""
@@ -78,7 +79,7 @@ class Client:
                 cmd = completer.prompt("> ").strip()
                 if not cmd:
                     continue
-                if cmd.lower() in ('quit', 'exit'):
+                if cmd.lower() in ("quit", "exit"):
                     break
                 self._dispatch_command(cmd)
         finally:
@@ -265,9 +266,7 @@ class Client:
             total = len(array)
             points_per_shot = total // shots
             if total % shots != 0:
-                raise ValueError(
-                    f"Array length ({total}) is not divisible by shots ({shots})"
-                )
+                raise ValueError(f"Array length ({total}) is not divisible by shots ({shots})")
             # reshape to (shots, time_points)
             data_2d = array.reshape(shots, points_per_shot)
         else:  # each item in the array is a shot
@@ -426,7 +425,7 @@ class Client:
         dt = package.header.get("format")
         dt = [(name, fmt) for name, fmt in dt]
         dt = np.dtype(dt)
-        arr = np.frombuffer(package.payload, dtype=dt)
+        arr = np.frombuffer(package.data, dtype=dt)
         return arr["real"] + 1.0j * arr["imag"]
 
     def _make_experiment_folder(self, experiment_name: str, config: dict) -> str:

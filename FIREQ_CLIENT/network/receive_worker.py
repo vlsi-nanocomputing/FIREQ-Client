@@ -84,13 +84,16 @@ class ReceiveWorker:
         """Loop reading framed messages until the worker is stopped."""
         try:
             while not self._stop_event.is_set():
+                # read the first 4 bytes which define the length of the header
                 size_bytes = self._recv_exactly(4)
-                msgpack_size = struct.unpack("!I", size_bytes)[0]
-                msgpack_bytes = self._recv_exactly(msgpack_size)
-                header = msgpack.unpackb(msgpack_bytes, raw=False)
+                header_size = struct.unpack("!I", size_bytes)[0]
+                # receive the header
+                header_bytes = self._recv_exactly(header_size)
+                header = msgpack.unpackb(header_bytes, raw=False)
+                # get the size of the traling data and receive it if needed
                 tsize = header.get("tsize")
-                payload = self._recv_exactly(tsize) if tsize is not None else None
-                self._queue.put(Message(header=header, payload=payload))
+                data = self._recv_exactly(tsize) if tsize is not None else b""
+                self._queue.put(Message(header=header, data=data))
         except (
             ConnectionError,
             OSError,

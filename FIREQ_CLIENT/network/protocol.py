@@ -33,7 +33,7 @@ class Message:
         # copy header and insert data length
         nheader = copy.deepcopy(self.header)
         if self.data:
-            nheader["tdata"] = len(self.data)
+            nheader["tsize"] = len(self.data)
         # pack the header and size
         header_bytes = msgpack.packb(nheader)
         header_size_bytes = struct.pack(">I", len(header_bytes))  # 4 bytes, network byte order
