@@ -108,6 +108,9 @@ class Client:
         if command == "ping":
             self._ping()
         elif command == "run_yaml":
+            if len(cmd_parts) < 2:
+                print("Usage: run_yaml <yaml_file>")
+                return
             yaml_file = cmd_parts[1]
             self._run_yaml(yaml_file)
         elif command == "reset_all":
@@ -118,6 +121,9 @@ class Client:
             m = {"generator": "/axisGeneratorIP_0"}
             self.sender.send(Message(header=m))
         elif command == "set_nyquist":
+            if len(cmd_parts) < 4:
+                print("Usage: set_nyquist <tile> <block> <zone>")
+                return
             self._set_nyquist(int(cmd_parts[1]), int(cmd_parts[2]), int(cmd_parts[3]))
         elif command == "export":
             if len(cmd_parts) < 3:

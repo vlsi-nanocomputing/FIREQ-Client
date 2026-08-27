@@ -10,20 +10,34 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory
 
 
-# At class level or inside run, define a combined completer
 class CommandCompleter(Completer):
-    """Complete commands, and for 'run_yaml' complete file paths."""
+    """Complete commands and command-specific arguments."""
 
     def __init__(self) -> None:
-        """Initialize the command and path completers."""
-        self.commands = WordCompleter(
-            ['ping', 'run_yaml', 'reset_all', 'mts_sync', 'set_nyquist', 'trigger_manually', 'export', 'quit', 'exit'],
-            ignore_case=True,
+        """Initialize the completers for commands and their arguments."""
+        # YAML files for run_yaml, directories for export
+        self.yaml_completer = PathCompleter(
+            expanduser=True,
+            file_filter=lambda path: os.path.isdir(path) or path.endswith((".yaml", ".yml")),
         )
-        self.path_completer = PathCompleter(expanduser=True)
+        self.dir_completer = PathCompleter(expanduser=True, only_directories=True)
+
+        # Define what arguments each command expects (command -> per-arg completers).
+        # Commands not listed here (ping, set_nyquist, quit, ...) get no suggestions
+        # in argument position. Note: commands are matched case-sensitively, exactly
+        # like _dispatch_command.
+        self.argument_specs = {
+            "run_yaml": [self.yaml_completer],
+            "export": [self.dir_completer, self.dir_completer],
+        }
+        commands = [
+            'ping', 'run_yaml', 'reset_all', 'mts_sync', 'set_nyquist',
+            'trigger_manually', 'export', 'quit', 'exit',
+        ]
+        self.command_completer = WordCompleter(commands)
 
     def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
-        """Yield command completions, or path completions for 'run_yaml'.
+        """Yield completions for the command or for the argument being typed.
 
         :param document: the current prompt document.
         :type document: Document
@@ -32,17 +46,38 @@ class CommandCompleter(Completer):
         :return: the completion suggestions.
         :rtype: Iterable[Completion]
         """
-        text = document.text_before_cursor.lstrip()
-        if text.startswith("run_yaml "):
-            # Use path completer for the part after command
-            # We take the text after the first space and feed to path completer
-            after = text[len("run_yaml "):]
-            # Create a modified document for the path part
-            path_doc = Document(after, len(after))
-            yield from self.path_completer.get_completions(path_doc, complete_event)
+        text_before = document.text_before_cursor
+        cmd_tokens = text_before.lstrip().split()
+
+        # No command typed yet -> command completion
+        if not cmd_tokens:
+            yield from self.command_completer.get_completions(document, complete_event)
+            return
+
+        # Which argument are we completing?
+        if text_before[-1].isspace():
+            arg_index = len(cmd_tokens) - 1  # cursor at the start of a new argument
         else:
-            # Command completion for the whole line
-            yield from self.commands.get_completions(document, complete_event)
+            arg_index = len(cmd_tokens) - 2  # cursor inside the last token
+
+        # Still completing the command word
+        if arg_index < 0:
+            yield from self.command_completer.get_completions(document, complete_event)
+            return
+
+        # Command-specific argument completers
+        command = cmd_tokens[0]
+        spec = self.argument_specs.get(command)
+        if not spec:
+            return
+
+        # Clamp out-of-range args to the last completer
+        completer = spec[arg_index] if arg_index < len(spec) else spec[-1]
+
+        # Micro-document for the argument being typed (empty right after a space)
+        current_text = "" if text_before[-1].isspace() else cmd_tokens[-1]
+        arg_doc = Document(current_text, len(current_text))
+        yield from completer.get_completions(arg_doc, complete_event)
 
 
 def make_prompt_session() -> PromptSession[str]:
