@@ -10,7 +10,7 @@ The client framework is organized into three main operational layers:
 
 1. **Connection Layer**: Establishes and manages non-blocking TCP socket sessions with the server.
 2. **Protocol & Networking Layer**: Implements length-prefixed binary framing  and manages background I/O threads.
-3. **Experiment & Processing Layer**: Resolves YAML templates, reconstructs raw binary DMA acquisition payloads into numerical arrays, and renders/exports dataset plots.
+3. **Experiment & Processing Layer**: Resolves YAML templates, reconstructs raw binary DMA acquisition payloads into numerical arrays, and stores experiment data.
 
 ---
 
@@ -22,7 +22,7 @@ A standard client runtime lifecycle proceeds as follows:
 2. **Handshake & Auth**: Performs authentication via shared token validation.
 3. **YAML Preprocessing**: Loads `.yaml` experiment definitions and resolves internal variable placeholders.
 4. **Command Execution**: Dispatches execution requests.
-5. **Data Streaming & Export**: Listens for inbound binary DMA frames, converts complex IQ payloads into structured data, and saves them locally as CSV/JSON/Pickle files while rendering plots.
+5. **Data Streaming & Export**: Listens for inbound binary DMA frames, converts complex IQ payloads into structured data, and saves them locally as JSON/Pickle files. The client `export` command creates the single-`data.pkl` format consumed by the separate `FIREQ_PLOTTER` package.
 
 ---
 
@@ -37,8 +37,8 @@ For detailed class and function signatures, select one of the submodules below:
    :toctree: _autosummary
    :nosignatures:
 
-   client_package.client.Client
-   client_package.prompt_completer
+   FIREQ_CLIENT.client.Client
+   FIREQ_CLIENT.prompt_completer
 
 .. rubric:: Protocol & Socket Workers
 
@@ -46,9 +46,9 @@ For detailed class and function signatures, select one of the submodules below:
    :toctree: _autosummary
    :nosignatures:
 
-   client_package.protocol.Message
-   client_package.socket_sender.ThreadedSocketSender
-   client_package.socket_reader.ThreadedSocketReader
+   FIREQ_CLIENT.network.protocol.Message
+   FIREQ_CLIENT.network.send_worker.SendWorker
+   FIREQ_CLIENT.network.receive_worker.ReceiveWorker
 
 .. rubric:: Configuration & Preprocessing
 
@@ -56,16 +56,26 @@ For detailed class and function signatures, select one of the submodules below:
    :toctree: _autosummary
    :nosignatures:
 
-   client_package.yaml_preprocessor
+   FIREQ_CLIENT.yaml_preprocessor
 
-.. rubric:: Plotting & Data Utilities
+.. rubric:: Data & Export Utilities
 
 .. autosummary::
    :toctree: _autosummary
    :nosignatures:
 
-   client_package.plotting.plot_2d
-   plotter.CommandCompleter
-   other.data_fetcher.Message
-   other.data_fetcher.ThreadedSocketReader
+   FIREQ_CLIENT.data
+   FIREQ_CLIENT.export
+
+.. rubric:: Plotting
+
+.. autosummary::
+   :toctree: _autosummary
+   :nosignatures:
+
+   FIREQ_PLOTTER.plotter.CommandCompleter
+   FIREQ_PLOTTER.plotting.plot_2d
+   FIREQ_PLOTTER.plotting.plot_3d_heatmap
+   FIREQ_PLOTTER.plotting.plot_iq
+   FIREQ_PLOTTER.plotting.plot_spectr
 ```

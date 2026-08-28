@@ -15,7 +15,7 @@ The client is responsible for:
 
 ## Typical workflow
 
-A typical session starts with the client connecting to the server, then loading an experiment definition from a YAML file. The configuration is sent to the server, the experiment is executed, and the resulting data are saved locally as CSV and PKL files. The same workflow can be used for single-shot experiments as well as swept experiments with multiple parameter values.
+A typical session starts with the client connecting to the server, then loading an experiment definition from a YAML file. The configuration is sent to the server, the experiment is executed, and the resulting data are saved locally as PKL files. The same workflow can be used for single-shot experiments as well as swept experiments with multiple parameter values.
 
 ## Main concepts
 

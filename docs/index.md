@@ -12,10 +12,10 @@ The client is designed for three main tasks:
 
 For a more detailed explanation, see:
 
-- [Overview](overview.md)
-- [Installation](installation.md)
-- [Usage](usage.md)
-- [API](api.md)
+- [Overview](overview.md): Python interface for connecting to the FIREQ server.
+- [Installation](installation.md): setup of the client and its dependencies.
+- [Usage](usage.md): define and launch experiments, collect results, and process outputs.
+- [API](api.md): client interfaces for configuration, execution, data, and plotting.
 
 ```{toctree}
 :maxdepth: 2
