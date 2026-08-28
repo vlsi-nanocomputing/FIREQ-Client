@@ -34,7 +34,8 @@ def _plot_spectr(exp_0: str, exp_1: str, save: bool = False) -> None:
         config_1 = json.load(f)
 
     if get_var_names(df_1) != get_var_names(df_0) or config_0["variables"] != config_1["variables"]:
-        print("error, mismatch in variable configuration or var order")
+        print("Error: mismatch in sweep variables or variable definitions between the two experiments.")
+        return
 
     for config in [config_0, config_1]:
         if config["sys_config"]["/axisAcquisitionIP_0"]["$output_type"] != "accumulated":
@@ -72,8 +73,8 @@ def _plot_spectr(exp_0: str, exp_1: str, save: bool = False) -> None:
     plt.plot(
         [iq_0[maxarg].real, iq_1[maxarg].real],
         [iq_0[maxarg].imag, iq_1[maxarg].imag],
-        color='red',
-        marker='o',
+        color="red",
+        marker="o",
         label=f"Frequency of maximal distance: {best_f:.4f}",
     )
     plt.title("Spectroscopy based frequency optimization")

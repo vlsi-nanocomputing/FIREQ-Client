@@ -66,14 +66,14 @@ def _plot_iq(exp_0: str, exp_1: str, save: bool = False) -> None:
     # plot a scatter to show the data, show the two means and a line connecting them
     plt.figure(figsize=(10, 5))
     plt.subplot(1, 2, 1)
-    plt.scatter(iq_0_rot.real, iq_0_rot.imag, s=5, alpha=0.5, label='Rotated 0')
-    plt.scatter(iq_1_rot.real, iq_1_rot.imag, s=5, alpha=0.5, label='Rotated 1')
+    plt.scatter(iq_0_rot.real, iq_0_rot.imag, s=5, alpha=0.5, label="Rotated 0")
+    plt.scatter(iq_1_rot.real, iq_1_rot.imag, s=5, alpha=0.5, label="Rotated 1")
     plt.plot(
         [mean_0_rot.real, mean_1_rot.real],
         [mean_0_rot.imag, mean_1_rot.imag],
-        color='red',
-        marker='o',
-        label='Means Line',
+        color="red",
+        marker="o",
+        label="Means Line",
     )
     plt.title("Rotated IQ Plane")
     plt.xlabel("I (Real)")
@@ -102,8 +102,8 @@ def _plot_iq(exp_0: str, exp_1: str, save: bool = False) -> None:
 
     # 3. Use searchsorted to find how many elements are strictly less than each point in x_cdf
     # 'left' ensures we find the index where x_0_sorted < x_cdf[i]
-    x_0_cdf = np.searchsorted(x_0_sorted, x_cdf, side='left')
-    x_1_cdf = np.searchsorted(x_1_sorted, x_cdf, side='left')
+    x_0_cdf = np.searchsorted(x_0_sorted, x_cdf, side="left")
+    x_1_cdf = np.searchsorted(x_1_sorted, x_cdf, side="left")
     # normalize to 1
     x_0_cdf = x_0_cdf / x_0.shape[0]
     x_1_cdf = x_1_cdf / x_1.shape[0]
@@ -111,18 +111,18 @@ def _plot_iq(exp_0: str, exp_1: str, save: bool = False) -> None:
     # find where the two distances are maximized
     x_cdf_abs_diff = np.abs(x_0_cdf - x_1_cdf)
     threshold = np.argmax(x_cdf_abs_diff)
-    fidelity = x_cdf_abs_diff[threshold]
+    fidelity = 100 * x_cdf_abs_diff[threshold]
 
     print(f"maximum fidelity with threshold: {threshold} is equal to: {fidelity:.2f}%")
 
     # Plot the two cumulative distributions (CDF)
-    plt.plot(x_cdf, x_0_cdf, label='CDF 0', linewidth=1.5)
-    plt.plot(x_cdf, x_1_cdf, label='CDF 1', linewidth=1.5)
+    plt.plot(x_cdf, x_0_cdf, label="CDF 0", linewidth=1.5)
+    plt.plot(x_cdf, x_1_cdf, label="CDF 1", linewidth=1.5)
     plt.plot(
         [x_cdf[threshold]] * 2,
         [x_0_cdf[threshold], x_1_cdf[threshold]],
-        color='red',
-        marker='o',
+        color="red",
+        marker="o",
         label=f"Point of maximum fidelity: {fidelity:.2f}%",
     )
     plt.title("Cumulative Distribution (X-axis)")

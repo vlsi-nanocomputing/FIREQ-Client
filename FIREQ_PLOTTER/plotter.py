@@ -123,6 +123,7 @@ def main() -> None:
             save_opt = cmd_parts[3] if len(cmd_parts) >= 4 else ""
             if not exp_dir:
                 print("No experiment directory defined")
+                continue
             save_opt = True if save_opt == "save" else False
             if plot_opt == "ri":
                 _plot_2d(cmd_parts[1], plot_magnitude=False, plot_imag=True, plot_real=True, save=save_opt)
@@ -139,6 +140,7 @@ def main() -> None:
             save_opt = True if save_opt == "save" else False
             if not exp_dir:
                 print("No experiment directory defined")
+                continue
             if plot_opt == "p":
                 _plot_3d_heatmap(cmd_parts[1], plot_magnitude=False, plot_phase=True, save=save_opt)
             elif plot_opt == "r":
@@ -154,6 +156,7 @@ def main() -> None:
             save_opt = True if save_opt == "save" else False
             if len(cmd_parts) < 3:
                 print("command must contain two experiment directories")
+                continue
             else:
                 _plot_iq(exp_dir_0, exp_dir_1, save_opt)
         elif command == "plot_spectr":
@@ -163,6 +166,7 @@ def main() -> None:
             save_opt = True if save_opt == "save" else False
             if len(cmd_parts) < 3:
                 print("command must contain two experiment directories")
+                continue
             else:
                 _plot_spectr(exp_dir_0, exp_dir_1, save_opt)
         else:
