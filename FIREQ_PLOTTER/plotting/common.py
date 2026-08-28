@@ -8,6 +8,9 @@ import numpy as np
 import pandas as pd
 from matplotlib.widgets import Slider
 
+# sampletime for raw and decimated samples.
+# TODO: it's not an issue now because all overlays share the same fixed clocking but it
+# breaks the layer isolation between client and server and should be fixed in the next release.
 TIME_MULTIPLIER = {
     "raw": 0.4283168859,
     "decimated": 1.7132675438,
