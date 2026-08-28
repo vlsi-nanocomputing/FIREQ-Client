@@ -36,12 +36,13 @@ firmware repositories.
 
 ```text
 FIREQ-Client/
-├── client_package/     Python client package
-├── experiments/        Example experiment scripts and workflows
-├── other/              Additional utilities or support files
-├── docs/               Client-specific documentation
-├── run_client.py       Minimal client entry point
-├── requirements.txt    Python dependencies
+├── FIREQ_CLIENT/                                    Python client package
+├── FIREQ_PLOTTER/                                   Plotting utilities and REPL
+├── yaml_experiment_configurations_examples/         Example experiment YAML configurations
+├── testing/                                         Test scripts
+├── docs/                                            Client-specific documentation
+├── run_client.py                                    Minimal client entry point
+├── requirements.txt                                 Python dependencies
 └── README.md
 ```
 
@@ -92,10 +93,10 @@ A minimal client execution can be started with:
 python run_client.py
 ```
 
-Example scripts and experimental workflows are available in:
+Example experiment YAML configurations are available in:
 
 ```text
-experiments/
+yaml_experiment_configurations_examples/
 ```
 
 ## Contributing and Support
@@ -105,7 +106,7 @@ Contributions to FIREQ-Client are welcome.
 You can contribute by:
 
 - improving the client implementation;
-- adding or updating examples in `experiments/`;
+- adding or updating examples in `yaml_experiment_configurations_examples/`;
 - improving the documentation in `docs/`;
 - reporting bugs or unexpected behavior;
 - suggesting new features or use cases.
