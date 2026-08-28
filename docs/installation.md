@@ -20,7 +20,15 @@ On Windows PowerShell, the activation command is:
 
 ## Running the client
 
-Once the dependencies are installed, the client can be started with:
+Before launching the client, open `run_client.py` and set the server address
+and port to match the board configuration:
+
+```python
+SERVER_IP = "<board-ip>"
+SERVER_PORT = 5000
+```
+
+Now, the client can be started with:
 
 ```bash
 python run_client.py
