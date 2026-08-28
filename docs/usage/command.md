@@ -37,5 +37,3 @@ The interactive shell provides a direct interface to control the FIREQ server, c
 | Command | Status | Description |
 | :--- | :--- | :--- |
 | `trigger manually` | *Placeholder* | Issues an immediate manual hardware trigger request. _(Intended for future release functionality)_ |
-
----

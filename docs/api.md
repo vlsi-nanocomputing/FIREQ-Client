@@ -68,3 +68,4 @@ For detailed class and function signatures, select one of the submodules below:
    plotter.CommandCompleter
    other.data_fetcher.Message
    other.data_fetcher.ThreadedSocketReader
+```
