@@ -4,7 +4,7 @@
 
 | Command | Target Data Dimensionality | Input | Primary Use Case |
 | :--- | :--- | :--- | :--- |
-| `plot_2d` | 1D / Multi-D (with Slicers) | Experiment directory with `data.pkl` | Standard line plots for 1D sweeps or multi-sweep data with dynamic slice controls. |
+| `plot_2d` | 1D / Multi-D (with slider controls) | Experiment directory with `data.pkl` | Standard line plots for 1D sweeps or multi-sweep data with dynamic slice controls. |
 | `plot_3d_heat` | 2D / Time-Domain Traces | Experiment directory with `data.pkl` | 2D color maps (heatmaps) for 2-variable sweeps or time-of-flight evolution over a sweep. |
 | `plot_iq` | Single-Shot IQ Cloud | Two experiment directories with `data.pkl` | Complex plane scatter plots for state discrimination ($\vert{}0\rangle$ vs $\vert{}1\rangle$). |
 | `plot_spectr` | 1D Frequency / Power Sweeps | Two experiment directories with `data.pkl` | Overlaid response curves comparing transmission/dispersion shifts between two states. |
@@ -15,10 +15,7 @@
 
 ### 2.1 `plot_2d`
 
-Visualizes standard $Y(X)$ response curves across parameter sweeps. The input
-directory must contain `data.pkl`. Non-swept experiments can be plotted
-directly after `run_yaml`; swept experiments require the client's `export`
-command first.
+Visualizes standard $Y(X)$ response curves across parameter sweeps and time-domain traces. The target directory must contain `data.pkl`. For `raw` or `decimated` acquisitions, the experiment can be plotted directly after `run_yaml`. For `accumulated` data, `plot_2d` only accepts experiments that include at least one sweep variable; non-swept accumulated data is rejected and the function directs the user to `plot_iq`. Swept data that must be exported first for downstream plotting should be prepared with the client's `export` command.
 
 #### Behavior
 * **Single Sweep Variable:** Generates a 2D line plot mapping the measured IQ magnitude or quadrature components against the swept parameter.
@@ -65,5 +62,6 @@ Compares spectral response curves (e.g., resonator transmission or qubit spectro
 
 #### Input Requirements & Characteristics
 
-- **Prerequisite:** Both target directories must contain `data.pkl` files from experiments executed with the exact same sweep vector (same range, step count, and variable target). Export swept experiments before plotting them.
+- **Prerequisite:** Both target directories must contain `data.pkl` files from experiments executed with the exact same sweep vector (same range, step count, and variable target). Export swept experiments before plotting them.  
+
 - **Output:** Overlays response curves for state $\vert{}0\rangle$ and state $\vert{}1\rangle$, enabling direct measurement of dispersive frequency shifts ($\chi$) or readout contrast optimization.

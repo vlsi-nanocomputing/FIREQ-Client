@@ -1,6 +1,6 @@
 # FIREQ Client Architecture & Reference
 
-Welcome to the `FIREQ-Client` API reference and architecture guide. The client acts as the front-end workstation interface that connects to the `FIREQ-Server`, processes experiment definitions, manages non-blocking TCP streams, and visualizes acquisition results.
+Welcome to the `FIREQ-Client` API reference and architecture guide. The client acts as the front-end workstation interface that connects to the `FIREQ-Server`, processes experiment definitions, manages TCP streams, and visualizes acquisition results.
 
 ---
 
@@ -8,8 +8,8 @@ Welcome to the `FIREQ-Client` API reference and architecture guide. The client a
 
 The client framework is organized into three main operational layers:
 
-1. **Connection Layer**: Establishes and manages non-blocking TCP socket sessions with the server.
-2. **Protocol & Networking Layer**: Implements length-prefixed binary framing  and manages background I/O threads.
+1. **Connection Layer**: Establishes and manages TCP socket sessions with the server.
+2. **Protocol & Networking Layer**: Implements length-prefixed binary framing and manages background I/O threads.
 3. **Experiment & Processing Layer**: Resolves YAML templates, reconstructs raw binary DMA acquisition payloads into numerical arrays, and stores experiment data.
 
 ---
@@ -74,8 +74,8 @@ For detailed class and function signatures, select one of the submodules below:
    :nosignatures:
 
    FIREQ_PLOTTER.plotter.CommandCompleter
-   FIREQ_PLOTTER.plotting.plot_2d
-   FIREQ_PLOTTER.plotting.plot_3d_heatmap
-   FIREQ_PLOTTER.plotting.plot_iq
-   FIREQ_PLOTTER.plotting.plot_spectr
+   FIREQ_PLOTTER.plotting.plot_2d._plot_2d
+   FIREQ_PLOTTER.plotting.plot_3d_heatmap._plot_3d_heatmap
+   FIREQ_PLOTTER.plotting.plot_iq._plot_iq
+   FIREQ_PLOTTER.plotting.plot_spectr._plot_spectr
 ```

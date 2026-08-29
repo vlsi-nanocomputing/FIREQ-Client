@@ -38,7 +38,7 @@ Contributions to FIREQ-Client are welcome.
 You can contribute by:
 
 - improving the client implementation;
-- adding or updating examples in `experiments/`;
+- adding or updating examples in `yaml_experiment_configurations_examples/`;
 - improving the documentation in `docs/`;
 - reporting bugs or unexpected behavior;
 - suggesting new features or use cases.

@@ -6,7 +6,7 @@ Experiments in the FIREQ platform are defined using a structured YAML specificat
 
 ## 1. YAML Configuration Architecture
 
-Experiment definitions are stored in YAML format (typically within the `experiments/` directory) and structured into three primary top-level sections:
+Experiment definitions are stored in YAML format (typically within the `experiments/` directory). If that directory does not exist yet, the client creates it automatically when the experiment is launched. The file is then structured into three primary top-level sections:
 
 1. **`preprocess`**: Defines static constants and reusable macros.
 2. **`variables`**: Specifies parameter sweeps using linear ranges.
@@ -34,8 +34,6 @@ Configures signal demodulation, output processing modes, and trigger timing.
 
 | Parameter | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `_name` | `str` | Yes | Name of the acquisition node instance |
-| `_ll_handler` | `AcquisitionDriver` | Internal | Low-level driver handler |
 | `$duration` | `float` | Yes | Acquisition window duration in nanoseconds (`ns`) |
 | `$output_type` | `str` | Yes | Data output mode: `"raw"`, `"decimated"`, or `"accumulated"` |
 | `$rfrequency` | `float` | Yes | Demodulation frequency in `MHz` |
@@ -53,8 +51,6 @@ Manages signal generation, RF frequency synthesis, and child definitions for pul
 
 | Parameter | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `_name` | `str` | Yes | Name of the signal generator instance |
-| `_ll_handler` | `GeneratorDriver` | Internal | Low-level driver handler |
 | `$dfrequency` | `float` | Yes | Drive carrier frequency in `MHz` |
 | `$rfrequency` | `float` | Yes | Readout carrier frequency in `MHz` |
 | `$rphase` | `float` | Yes | Readout phase in radians |
@@ -118,7 +114,7 @@ Specifies channel-specific trigger delay offsets.
 | :--- | :--- | :--- | :--- |
 | `_name` | `str` | Required | Identifier for the delay instance |
 | `_ttype` | `str` | Required | Trigger target type: `"drive"` or `"readout"` |
-| `_channel_mask` / `_channel` | `int` | Required | Channel index or bitmask target |
+| `_channel` | `int` | Required | Channel index or bitmask target |
 | `_index` | `int` | Optional | Sequence index for multi-drive delay tracking |
 | `_generate_trigger` | `bool` | `False` | Fires a physical trigger upon delay counter expiration |
 | `$delay` | `float` | Required | Timing delay value in nanoseconds (`ns`) |
@@ -209,8 +205,8 @@ python run_client.py
 3. run an experiment:
 
 ```text
-run_yaml experiments/<experiment_name>.yaml
+run_yaml yaml_experiment_configurations_examples/<experiment_name>.yaml
 ```
 
-5. wait for the acquisition to complete,
-6. inspect the generated output files.
+4. wait for the acquisition to complete,
+5. inspect the generated output files.

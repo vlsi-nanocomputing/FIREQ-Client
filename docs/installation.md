@@ -28,5 +28,5 @@ Now, the client can be started with:
 python run_client.py
 ```
 
-The startup script currently points to the default server address and port defined in the repository. These values can be adjusted before launching the client if needed.
+The startup script currently points to the default server address and port defined in the repository. The address and port are entered at runtime.
 
