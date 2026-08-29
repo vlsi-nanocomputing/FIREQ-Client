@@ -20,13 +20,7 @@ On Windows PowerShell, the activation command is:
 
 ## Running the client
 
-Before launching the client, open `run_client.py` and set the server address
-and port to match the board configuration:
-
-```python
-SERVER_IP = "<board-ip>"
-SERVER_PORT = 5000
-```
+Before launching the client, make sure you know the board's server address and port. `run_client.py` prompts for both values at startup; pressing Enter uses `0.0.0.0` and `5000` as the defaults.
 
 Now, the client can be started with:
 
