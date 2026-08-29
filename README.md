@@ -42,6 +42,7 @@ FIREQ-Client/
 ├── testing/                                         Test scripts
 ├── docs/                                            Client-specific documentation
 ├── run_client.py                                    Minimal client entry point
+├── run_plotter.py                                   Plotter entry point
 ├── requirements.txt                                 Python dependencies
 └── README.md
 ```
