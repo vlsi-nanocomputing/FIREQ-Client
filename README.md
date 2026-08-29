@@ -1,4 +1,6 @@
 # FIREQ-Client
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22161722.svg)](https://doi.org/10.5281/zenodo.22161664)
+[![GitHub Release](https://img.shields.io/github/v/release/vlsi-nanocomputing/FIREQ-Server)](https://github.com/vlsi-nanocomputing/FIREQ-Server/releases/latest)
 
 FIREQ-Client is the Python client-side component of the FIREQ platform.
 
