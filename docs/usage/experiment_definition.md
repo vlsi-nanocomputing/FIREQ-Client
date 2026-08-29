@@ -26,7 +26,7 @@ The YAML parser relies on specialized prefixes to interpret values and construct
 
 ## 2. Hardware Node Configuration Reference
 
-This section details all available parameters, default behavior, and structural requirements for each node type in the `sys_config` hierarchy.
+This section details all available parameters, default behavior, and structural requirements for each node type in the `sys_config` hierarchy. Every experiment must also define the required top-level `sys_config.$shots` integer, which sets the number of acquisitions per sweep point.
 
 ### 2.1 Acquisition Node (`/axisAcquisitionIP_*`)
 
