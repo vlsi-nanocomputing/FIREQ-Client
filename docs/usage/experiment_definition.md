@@ -197,7 +197,7 @@ To execute an experiment using the FIREQ environment
 1. start the FIREQ server first:
 
 ```bash
-python API.py
+python start_server.py
 ```
 
 2. start the client:
