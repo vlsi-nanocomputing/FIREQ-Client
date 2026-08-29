@@ -21,7 +21,7 @@ directly after `run_yaml`; swept experiments require the client's `export`
 command first.
 
 #### Behavior
-* **Single Sweep Variable:** Generates a 2D line plot mapping the measured IQ magnitude, phase, or quadrature components against the swept parameter.
+* **Single Sweep Variable:** Generates a 2D line plot mapping the measured IQ magnitude or quadrature components against the swept parameter.
 * **Multi-Sweep Variables:** Automatically detects additional sweep dimensions and inserts interactive UI sliders, allowing real-time navigation through 1D slices of higher-dimensional datasets.
 
 ---
