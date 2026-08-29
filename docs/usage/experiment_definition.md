@@ -9,7 +9,7 @@ Experiments in the FIREQ platform are defined using a structured YAML specificat
 Experiment definitions are stored in YAML format (typically within the `experiments/` directory) and structured into three primary top-level sections:
 
 1. **`preprocess`**: Defines static constants and reusable macros.
-2. **`variables`**: Specifies parameter sweeps (e.g., linear or logarithmic ranges).
+2. **`variables`**: Specifies parameter sweeps using linear ranges.
 3. **`sys_config`**: Describes the target hardware configuration tree and node parameter callbacks.
 
 ### Syntax & Prefix Rules
