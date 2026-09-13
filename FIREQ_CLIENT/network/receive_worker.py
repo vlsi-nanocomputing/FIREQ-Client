@@ -1,9 +1,9 @@
 """Receive worker thread class."""
 
-import queue
 import socket
 import struct
-import threading
+from queue import Queue
+from threading import Event, Thread
 
 import msgpack
 
@@ -20,12 +20,12 @@ class ReceiveWorker:
         :type sock: socket.socket
         """
         self._sock = sock
-        self._queue = queue.Queue()
-        self._stop_event = threading.Event()
-        self._thread = threading.Thread(target=self._reader_loop, daemon=True)
+        self._queue = Queue()
+        self._stop_event = Event()
 
     def start(self) -> None:
-        """Start the background reading thread."""
+        """Start the receive worker thread."""
+        self._thread = Thread(target=self._run, daemon=True)
         self._thread.start()
 
     def stop(self, timeout: float | None = None) -> None:
@@ -55,7 +55,7 @@ class ReceiveWorker:
         return self._queue.get(block, timeout)
 
     @property
-    def message_queue(self) -> queue.Queue:
+    def message_queue(self) -> Queue:
         """Return the underlying queue."""
         return self._queue
 
@@ -73,14 +73,16 @@ class ReceiveWorker:
                 raise ConnectionError("Stopped by user")
             try:
                 chunk = self._sock.recv(n - len(data))
-            except OSError:
-                raise ConnectionError("Socket error") from None
+            except TimeoutError:
+                continue
+            except OSError as e:
+                raise ConnectionError("Socket error") from e
             if not chunk:
                 raise ConnectionError("Connection closed")
             data += chunk
         return data
 
-    def _reader_loop(self) -> None:
+    def _run(self) -> None:
         """Loop reading framed messages until the worker is stopped."""
         try:
             while not self._stop_event.is_set():
