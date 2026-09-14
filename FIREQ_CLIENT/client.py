@@ -64,7 +64,7 @@ class Client:
         # Create a session with history file
         completer = make_prompt_session()
 
-        print("Connected. Type commands (empty function dispatch). 'quit' to exit.")
+        self.log.info("Connected. Type commands (empty function dispatch). 'quit' to exit.")
         try:
             while True:
                 cmd = completer.prompt("> ").strip()
@@ -75,7 +75,7 @@ class Client:
                 self._dispatch_command(cmd)
         finally:
             self._disconnect()
-            print("Disconnected.")
+            self.log.info("Disconnected.")
 
     def _connect(self, timeout: float = 60.0) -> bool:
         """Connect to the server and start the network workers."""
