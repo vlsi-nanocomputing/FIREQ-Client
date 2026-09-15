@@ -73,11 +73,13 @@ class Client:
                 if cmd.lower() in ("quit", "exit"):
                     break
                 self._dispatch_command(cmd)
+        except KeyboardInterrupt:
+            pass
         finally:
             self._disconnect()
             self.log.info("Disconnected.")
 
-    def _connect(self, timeout: float = 60.0) -> bool:
+    def _connect(self, timeout: float = 1.0) -> bool:
         """Connect to the server and start the network workers."""
         self.sock = socket.create_connection((self.host, self.port), timeout=timeout)
         self.reader = ReceiveWorker(self.sock)
@@ -92,7 +94,7 @@ class Client:
             self.reader.stop()
         if self.sender:
             self.sender.stop()
-        # In case one of the stops already closed the socket
+        # close the socket
         try:
             self.sock.close()
         except OSError:
@@ -119,6 +121,12 @@ class Client:
         command = cmd_parts[0]
         if command == "ping":
             self._ping()
+        elif command == "config_yaml":
+            if len(cmd_parts) < 2:
+                print("Usage: config_yaml <yaml_file>")
+                return
+            yaml_file = cmd_parts[1]
+            self._config_from_yaml(yaml_file)
         elif command == "run_yaml":
             if len(cmd_parts) < 2:
                 print("Usage: run_yaml <yaml_file>")
@@ -133,8 +141,7 @@ class Client:
             if len(cmd_parts) < 2:
                 print("Usage: trigger_manually <generator_IP_name>")
                 return
-            m = {"generator": cmd_parts[1]}
-            self.sender.send(Message(header=m))
+            self._trigger_manually(cmd_parts[1])
         elif command == "set_nyquist":
             if len(cmd_parts) < 4:
                 print("Usage: set_nyquist <tile> <block> <zone>")
@@ -147,6 +154,20 @@ class Client:
                 self._export(cmd_parts[1], cmd_parts[2])
         else:
             print(f"Unknown command: {command}")
+
+    # ------------------------------------------------------------------
+    # Commands
+    # ------------------------------------------------------------------
+    def _trigger_manually(self, ip_name: str) -> None:
+        """
+        Trigger an IP manually if supported.
+
+        :param ip_name: Name of the IP to be triggered.
+        :type ip_name: str
+        """
+        self.sender.send(Message(header={"cmd": "trigger_manually", "ip_name": ip_name}))
+        resp = self._wait_for_message()
+        print(resp.header)
 
     def _ping(self) -> None:
         """Send a ping to confirm the session is working."""
@@ -175,6 +196,29 @@ class Client:
         response = self.reader._queue.get()
         print("Reset all response: ", response.header)
 
+    def _config_from_yaml(self, yaml_file: str) -> None:
+        """
+        Load a YAML file and configure the system.
+
+        :param yaml_file: path to the YAML configurtion file.
+        :type yaml_file: str
+        """
+        # load and preprocess the file
+        config = load_and_resolve(yaml_file)
+        # TODO: maybe do a check here or something
+        # send the config to the server
+        self.sender.send(
+            Message(
+                header={
+                    "cmd": "apply_configuration",
+                    "system": config["sys_config"],
+                    "variables": config["variables"],
+                }
+            )
+        )
+        resp = self._wait_for_message()
+        print(f"{resp}")
+
     def _run_yaml(self, yaml_file: str) -> None:
         """Load a YAML file and run the experiment it describes.
 
@@ -183,7 +227,7 @@ class Client:
         """
         # load and preprocess the file
         config = load_and_resolve(yaml_file)
-        # check for the existance of keys
+        # check for the existance of keys TODO: why is there a check on variable keys?
         if "sys_config" not in config or "variables" not in config:
             raise ValueError(f"Invalid YAML file: {yaml_file}")
         # send the config to the server

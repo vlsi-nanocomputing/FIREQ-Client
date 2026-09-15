@@ -38,11 +38,6 @@ class ReceiveWorker:
         :type timeout: float | None
         """
         self._stop_event.set()
-        try:
-            self._sock.shutdown(0)
-        except OSError:
-            pass
-        self._sock.close()
         self._thread.join(timeout)
 
     def get_message(self, block: bool = True, timeout: float | None = None) -> Message:
@@ -101,6 +96,8 @@ class ReceiveWorker:
                 self._queue.put(Message(header=header, data=data))
             except TimeoutError:
                 continue
+            except ConnectionError:
+                break
             except Exception as e:
                 self.log.exception(f"Caught exception {e} in receive worker, shutting down")
                 break

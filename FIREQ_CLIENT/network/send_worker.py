@@ -1,9 +1,9 @@
 """Threaded sender worker."""
 
+import logging
 import queue
 import socket
 import threading
-import logging
 
 from .protocol import Message
 
@@ -36,12 +36,6 @@ class SendWorker:
         :type timeout: float | None
         """
         self._stop_event.set()
-        # Unblock the queue by pushing a sentinel (optional) or close socket
-        try:
-            self._sock.shutdown(1)  # SHUT_WR
-        except OSError:
-            pass
-        self._sock.close()
         self._thread.join(timeout)
 
     def send(self, message: Message) -> None:
