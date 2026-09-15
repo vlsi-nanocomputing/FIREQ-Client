@@ -208,5 +208,9 @@ python run_client.py
 run_yaml yaml_experiment_configurations_examples/<experiment_name>.yaml
 ```
 
+The same file can be applied to the server without running the experiment, by using
+`config_yaml` instead of `run_yaml` (see the
+[interactive command reference](command.md)).
+
 4. wait for the acquisition to complete,
 5. inspect the generated output files.
