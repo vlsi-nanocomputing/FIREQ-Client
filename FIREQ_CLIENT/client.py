@@ -4,15 +4,17 @@ Connects to the server over TCP, performs the handshake, runs experiments
 from YAML configuration files and stores the results on disk.
 """
 
-import json
+import itertools
 import logging
 import os
 import shlex
 import socket
 import time
+from queue import Empty
 
 import numpy as np
 import pandas as pd
+import yaml
 from tqdm import tqdm
 
 from .export import export
@@ -44,36 +46,25 @@ class Client:
         self.reader: ReceiveWorker | None = None
         self.sender: SendWorker | None = None
 
-    def connect(self) -> None:
-        """Connect to the server and start the network workers."""
-        self.sock = socket.create_connection((self.host, self.port))
-        self.reader = ReceiveWorker(self.sock)
-        self.sender = SendWorker(self.sock)
-        self.reader.start()
-        self.sender.start()
-
-    def disconnect(self) -> None:
-        """Shut down the reader, the sender and close the socket."""
-        if self.reader:
-            self.reader.stop()
-        if self.sender:
-            self.sender.stop()
-        # In case one of the stops already closed the socket
-        try:
-            self.sock.close()
-        except OSError:
-            pass
-
-    # ─── Placeholder functions ───────────────────────────────────
-
-    def run(self) -> None:
+    def start(self) -> None:
         """Connect, perform the handshake and enter the command loop."""
-        self.connect()
+        connected = False
+        while not connected:
+            try:
+                self._connect()
+                connected = True
+            except Exception:
+                self.log.exception("Caught exception.")
+                r = input(" retry? [y/n] ")
+                if r:
+                    continue
+                else:
+                    return
         self._do_handshake()
         # Create a session with history file
         completer = make_prompt_session()
 
-        print("Connected. Type commands (empty function dispatch). 'quit' to exit.")
+        self.log.info("Connected. Type commands (empty function dispatch). 'quit' to exit.")
         try:
             while True:
                 cmd = completer.prompt("> ").strip()
@@ -82,9 +73,32 @@ class Client:
                 if cmd.lower() in ("quit", "exit"):
                     break
                 self._dispatch_command(cmd)
+        except (KeyboardInterrupt, EOFError):
+            pass
         finally:
-            self.disconnect()
-            print("Disconnected.")
+            self._disconnect()
+            self.log.info("Disconnected.")
+
+    def _connect(self, timeout: float = 1.0) -> bool:
+        """Connect to the server and start the network workers."""
+        self.sock = socket.create_connection((self.host, self.port), timeout=timeout)
+        self.reader = ReceiveWorker(self.sock)
+        self.sender = SendWorker(self.sock)
+        self.reader.start()
+        self.sender.start()
+        return True
+
+    def _disconnect(self) -> None:
+        """Shut down the reader, the sender and close the socket."""
+        if self.reader:
+            self.reader.stop()
+        if self.sender:
+            self.sender.stop()
+        # close the socket
+        try:
+            self.sock.close()
+        except OSError:
+            pass
 
     def _do_handshake(self) -> None:
         """Perform the protocol handshake with the server."""
@@ -107,6 +121,12 @@ class Client:
         command = cmd_parts[0]
         if command == "ping":
             self._ping()
+        elif command == "config_yaml":
+            if len(cmd_parts) < 2:
+                print("Usage: config_yaml <yaml_file>")
+                return
+            yaml_file = cmd_parts[1]
+            self._config_from_yaml(yaml_file)
         elif command == "run_yaml":
             if len(cmd_parts) < 2:
                 print("Usage: run_yaml <yaml_file>")
@@ -118,8 +138,10 @@ class Client:
         elif command == "mts_sync":
             self._mts_sync()
         elif command == "trigger_manually":
-            m = {"generator": "/axisGeneratorIP_0"}
-            self.sender.send(Message(header=m))
+            if len(cmd_parts) < 2:
+                print("Usage: trigger_manually <generator_IP_name>")
+                return
+            self._trigger_manually(cmd_parts[1])
         elif command == "set_nyquist":
             if len(cmd_parts) < 4:
                 print("Usage: set_nyquist <tile> <block> <zone>")
@@ -127,11 +149,25 @@ class Client:
             self._set_nyquist(int(cmd_parts[1]), int(cmd_parts[2]), int(cmd_parts[3]))
         elif command == "export":
             if len(cmd_parts) < 3:
-                print("command must contain a from and to directory")
+                print("Usage: export <from_directory> <to_directory>")
             else:
                 self._export(cmd_parts[1], cmd_parts[2])
         else:
             print(f"Unknown command: {command}")
+
+    # ------------------------------------------------------------------
+    # Commands
+    # ------------------------------------------------------------------
+    def _trigger_manually(self, ip_name: str) -> None:
+        """
+        Trigger an IP manually if supported.
+
+        :param ip_name: Name of the IP to be triggered.
+        :type ip_name: str
+        """
+        self.sender.send(Message(header={"cmd": "trigger_manually", "ip_name": ip_name}))
+        resp = self._wait_for_message()
+        print(resp.header)
 
     def _ping(self) -> None:
         """Send a ping to confirm the session is working."""
@@ -160,6 +196,29 @@ class Client:
         response = self.reader._queue.get()
         print("Reset all response: ", response.header)
 
+    def _config_from_yaml(self, yaml_file: str) -> None:
+        """
+        Load a YAML file and configure the system.
+
+        :param yaml_file: path to the YAML configurtion file.
+        :type yaml_file: str
+        """
+        # load and preprocess the file
+        config = load_and_resolve(yaml_file)
+        # TODO: maybe do a check here or something
+        # send the config to the server
+        self.sender.send(
+            Message(
+                header={
+                    "cmd": "apply_configuration",
+                    "system": config["sys_config"],
+                    "variables": config["variables"],
+                }
+            )
+        )
+        resp = self._wait_for_message()
+        print(f"{resp}")
+
     def _run_yaml(self, yaml_file: str) -> None:
         """Load a YAML file and run the experiment it describes.
 
@@ -168,7 +227,7 @@ class Client:
         """
         # load and preprocess the file
         config = load_and_resolve(yaml_file)
-        # check for the existance of keys
+        # check for the existance of keys TODO: why is there a check on variable keys?
         if "sys_config" not in config or "variables" not in config:
             raise ValueError(f"Invalid YAML file: {yaml_file}")
         # send the config to the server
@@ -184,10 +243,7 @@ class Client:
         # get the filename
         filename = os.path.basename(yaml_file)  # "file.yaml"
         exp_name = os.path.splitext(filename)[0]  # "file" (without extension)
-        if config.get("variables"):
-            self._fetch_with_variables(config, exp_name)
-        else:
-            self._fetch_without_variables(config, exp_name)
+        self._fetch_experiment(config, exp_name)
 
     def _mts_sync(self) -> None:
         """Send the mts_sync command to the server."""
@@ -204,79 +260,143 @@ class Client:
         export(from_dir, to_dir)
 
     # ------------------------------------------------------------------
-    def _fetch_without_variables(self, config: dict, experiment_name: str) -> None:
-        """Fetch and save the data of a single (non-swept) experiment.
+    # Helper methods
+    # ------------------------------------------------------------------
+
+    def _fetch_experiment(self, config: dict, experiment_name: str) -> None:
+        """Fetch and save the data of an experiment.
+
+        This function will retrieve all dma payloads from the server.
 
         :param config: resolved YAML configuration.
         :type config: dict
         :param experiment_name: name used for the output folder.
         :type experiment_name: str
         """
-        shots = config["sys_config"]["$shots"]
-        try:
-            self._wait_for_experiment_start()
-            result = self._fetch_shots(shots)
-            end_message = self._wait_for_experiment_stop()
-            result = self._make_df_from_shots(result[1], config["sys_config"][result[0]]["$output_type"], shots)
-            exp_dir = self._make_experiment_folder(experiment_name, config)
-            self._save_experiment(result, exp_dir, end_message)
+        # the first message must be the experiment header
+        message = self._wait_for_message()
+        if message.header.get("type") == "status":
+            pass
+        else:
+            raise TypeError(f"Unexpected message type from server while running experiment: {message.header}")
 
-        except Exception as e:
-            self.log.error(f"Failed to run experiment {e}")
+        # see if the message is the experiment header, get the var order and variable values
+        if message.header.get("msg") == "experiment_header":
+            # the var order is from outer to inner
+            var_order = message.header.get("variable_order", ["none"])
+            var_values = message.header.get("variable_values", {"none": np.array([0])})
+        else:
+            raise ValueError(f"Unexpected status message from server while running experiment: {message.header}")
 
-    def _fetch_shots(self, shots: int, leave_bar: bool = True) -> tuple[str, np.ndarray]:
-        """Fetch a single experiment (no sweep). Data may arrive in several DMA packages.
+        # make a points iterator and compute all points (total iterations)
+        points = itertools.product(*[range(len(var_values[v])) for v in var_order])
+        total_iterations = 1
+        for _, arr in var_values.items():
+            total_iterations *= len(arr)
 
-        :param shots: number of shots to fetch.
-        :type shots: int
-        :param leave_bar: keep the progress bar after completion.
-        :type leave_bar: bool
-        :return: the source name and the concatenated shot data.
-        :rtype: tuple[str, np.ndarray]
-        """
-        # NOTE: IT ONLY SUPPORTS A SINGLE SOURCE FOR NOW
-        collected_data = []
-        collected_shots = 0
-        pbar = tqdm(total=shots, desc="Fetching shots", leave=leave_bar)
-        while collected_shots < shots:
-            package = self._wait_for_next_dma()
-            package_source = package.header.get("source")
-            package_shots = package.header.get("shots")
-            package_data = self._decode_package(package)  # 1D array of shot results
+        # create the directory and save a summary
+        exp_dir = self._make_timestamped_experiment_directory(experiment_name)
+        summary = {
+            "experiment_name": experiment_name,
+            "full_experiment_header": message.header,
+            "var_order": var_order,
+            "var_values": var_values,
+            "expected_iterations": total_iterations,
+            "config": config,
+        }
+        self._save_dict(summary, exp_dir, "experiment_summary")
 
-            collected_data.append((package_source, package_data))
-            collected_shots += package_shots
-            pbar.update(package_shots)
+        # Progress bar over total number of iterations
+        pbar = tqdm(total=total_iterations, desc="Fetching")
 
-        pbar.close()
-        source = collected_data[0][0]
+        # get iterations until the experiment footer is received
+        iter_index = 0
+        fetched_shots = 0
+        iteration_shots = 0
+        per_ip_data = {}
+        subfolders = {}
+        experiment_stop = False
+        var_checkpoint = next(points)
+        runtimes = []
+        while not experiment_stop:
+            message = self._wait_for_message()
+            if message.header.get("type") == "dma_package":
+                # create the per-ip dictionary of results
+                source = message.header.get("source")
+                if source not in per_ip_data.keys():
+                    per_ip_data[source] = []
+                    subdir = source.replace("/", "")
+                    subfolders[source] = self._make_subdirectory(exp_dir, subdir)
 
-        # concatenate all pieces
-        return (source, np.concatenate([arr for _, arr in collected_data]))
+                per_ip_data[source].append(self._decode_package(message))
+                fetched_shots += message.header.get("shots")
+                iteration_shots += message.header.get("shots")
+
+            elif message.header.get("type") == "status":
+                if message.header.get("msg") == "iteration_ended":
+                    # save data if any was received
+                    if iteration_shots > 0:
+                        for source, package_list in per_ip_data.items():
+                            if not package_list:
+                                continue
+
+                            # Concatenate flat arrays once
+                            combined_arr = np.concatenate(package_list)
+
+                            # Compute shots per IP source safely and create the df
+                            shots_per_ip = iteration_shots // len(per_ip_data)
+                            df = self._make_df_from_shots(combined_arr, shots_per_ip)
+
+                            # save the dataframe
+                            filename = f"data_{'_'.join(map(str, var_checkpoint))}"
+                            self._save_dataframe(df, subfolders[source], filename)
+
+                            # Clear data list for the next iteration
+                            per_ip_data[source] = []
+                    # increment iteration index and reset iteration shots
+                    iter_index += 1
+                    iteration_shots = 0
+                    pbar.update(1)
+                    try:
+                        var_checkpoint = next(points)
+                    except StopIteration:
+                        self.log.debug("Caught stop iterator when advancing variables for next point")
+                elif message.header.get("msg") == "experiment_footer":
+                    experiment_stop = True
+                    pbar.close()
+                    self.log.info(
+                        f"Experiment ended, fetched {iter_index}/{total_iterations} iterations, {fetched_shots} total shots"
+                    )
+                    self._save_dict(
+                        {"runtimes": runtimes, "sweep_total": message.header.get("sweep_time")}, exp_dir, "runtimes"
+                    )
+                else:
+                    raise ValueError(
+                        f"Unexpected status message from server while running experiment: {message.header}"
+                    )
+            else:
+                raise TypeError(f"Unexpected message type from server while running experiment: {message.header}")
 
     @staticmethod
-    def _make_df_from_shots(array: np.ndarray, mode: str, shots: int) -> pd.DataFrame:
+    def _make_df_from_shots(array: np.ndarray, shots: int) -> pd.DataFrame:
         """Turn the shot array into a DataFrame indexed by shot and time.
 
-        :param array: raw shot samples.
+        The array must be 1-D. The resulting dataframe will be multi-index and include a
+        shot and time column. The time column will be fixed to 0 if the input array length is equal
+        to the input number of shots.
+
+        :param array: shot samples.
         :type array: np.ndarray
-        :param mode: output mode ("raw", "decimated" or accumulated).
-        :type mode: str
         :param shots: number of shots in the array.
         :type shots: int
         :return: DataFrame with "shot" and "time" index levels and a "value" column.
         :rtype: pd.DataFrame
         """
-        if mode in ("raw", "decimated"):
-            # split the array into shots equal pieces, make the dataframe with the time axis
-            total = len(array)
-            points_per_shot = total // shots
-            if total % shots != 0:
-                raise ValueError(f"Array length ({total}) is not divisible by shots ({shots})")
-            # reshape to (shots, time_points)
-            data_2d = array.reshape(shots, points_per_shot)
-        else:  # each item in the array is a shot
-            data_2d = array[:shots].reshape(shots, 1)  # each shot -> single value
+        total = len(array)
+        points_per_shot = total // shots
+        if total % shots != 0:
+            raise ValueError(f"Array length ({total}) is not divisible by shots ({shots})")
+        data_2d = array.reshape(shots, points_per_shot)
 
         n_times = data_2d.shape[1]
         index = pd.MultiIndex.from_product(
@@ -285,139 +405,18 @@ class Client:
         )
         return pd.DataFrame({"value": data_2d.ravel()}, index=index)
 
-    # ------------------------------------------------------------------
-    def _fetch_with_variables(self, config: dict, experiment_name: str) -> None:
-        """Fetch a swept experiment with multiple variable combinations.
+    def _wait_for_message(self) -> Message:
+        """Read the queue until a message is received.
 
-        :param config: resolved YAML configuration.
-        :type config: dict
-        :param experiment_name: name used for the output folder.
-        :type experiment_name: str
-        """
-        sys_config = config["sys_config"]
-        shots = sys_config["$shots"]
-        variable_specs = config["variables"]  # dict: name -> {start, end, num, mode}
-
-        # Build variable axes & compute total combinations
-        variable_checkpoint = {}
-        total_shots = shots
-        for var, var_def in variable_specs.items():
-            variable_checkpoint[var] = {
-                "num": var_def["num"],
-                "checkpoint": 0,
-            }
-            total_shots *= var_def["num"]
-
-        # Wait for the header to get variable order
-        var_order = self._wait_for_variable_order()
-        if var_order != [n for n in variable_specs.keys()]:
-            self.log.warning(f"Variable order mismatch: expected {[n for n in variable_specs.keys()]}, got {var_order}")
-            # Use the order from server
-
-        # make the experiment dir
-        exp_dir = self._make_experiment_folder(experiment_name, config)
-        self._save_dict(config, exp_dir, "configuration")
-        self._save_dict({i: name for i, name in enumerate(var_order)}, exp_dir, "var_order")
-
-        # function to update the checkpoints
-        def update_checkpoint() -> None:
-            """Increment the checkpoint counter, wrapping around at the max."""
-            for var in reversed(var_order):
-                variable_checkpoint[var]["checkpoint"] += 1
-                if variable_checkpoint[var]["checkpoint"] == variable_checkpoint[var]["num"]:
-                    variable_checkpoint[var]["checkpoint"] = 0
-                else:
-                    return
-
-        def make_filename(start: str) -> str:
-            """Build the output file name from the current checkpoints.
-
-            :param start: base name of the file.
-            :type start: str
-            :return: file name with the checkpoint values appended.
-            :rtype: str
-            """
-            name = start
-            for var in var_order:
-                check = variable_checkpoint[var]["checkpoint"]
-                name += f"_{check}"
-            return name
-
-        # Progress bar over total number of packages
-        pbar = tqdm(total=total_shots, desc="Fetching")
-
-        # Keep reading until we have filled all combinations
-        fetched_shots = 0
-        while fetched_shots < total_shots:
-            self._wait_for_experiment_start()
-            source, array = self._fetch_shots(shots, False)
-            df = self._make_df_from_shots(array, config["sys_config"][source]["$output_type"], shots)
-            self._save_dataframe(df, exp_dir, make_filename("data"))
-            response = self._wait_for_experiment_stop()
-            self._save_dict(response.header, exp_dir, make_filename("exp"))
-            fetched_shots += shots
-            pbar.update(shots)
-            update_checkpoint()
-
-        pbar.close()
-        end_message = self._wait_for_experiment_stop()
-        self._save_dict(end_message.header, exp_dir, "end_message")
-
-    # ------------------------------------------------------------------
-    # Helper methods
-    # ------------------------------------------------------------------
-    def _wait_for_variable_order(self) -> list[str]:
-        """Read the queue until we get the sweep_experiment_header.
-
-        :return: list of variable names in the order used by the server.
-        :rtype: list[str]
-        """
-        while True:
-            response = self.reader._queue.get()
-            typeh = response.header.get("type")
-            if typeh == "sweep_experiment_header":
-                return response.header.get("variables_order", [])
-            elif typeh is not None:
-                raise Exception(f"Got unexpected message from server: {response.header}")
-
-    def _wait_for_experiment_start(self) -> None:
-        """Read the queue until the server reports the experiment start."""
-        while True:
-            response = self.reader._queue.get()
-            typeh = response.header.get("type")
-            if typeh == "status":
-                self.log.info(f"{response.header}")
-                break
-            elif typeh is not None:
-                raise Exception(f"Got unexpected message from server: {response.header}")
-
-    def _wait_for_experiment_stop(self) -> Message:
-        """Read the queue until the server reports the experiment stop.
-
-        :return: the status message.
+        :return: message received from the server
         :rtype: Message
         """
         while True:
-            response = self.reader._queue.get()
-            typeh = response.header.get("type")
-            if typeh == "status":
-                return response
-            elif typeh is not None:
-                raise Exception(f"Got unexpected message from server: {response.header}")
-
-    def _wait_for_next_dma(self) -> Message:
-        """Read the queue until we get a DMA package.
-
-        :return: the DMA package message.
-        :rtype: Message
-        """
-        while True:
-            response = self.reader._queue.get()
-            typeh = response.header.get("type")
-            if typeh == "dma_package":
-                return response
-            elif typeh is not None:
-                raise Exception(f"Got unexpected message from server: {response.header}")
+            try:
+                response = self.reader._queue.get(timeout=1.0)
+            except Empty:
+                continue
+            return response
 
     def _decode_package(self, package: Message) -> np.ndarray:
         """Decode the payload of a DMA package into complex IQ samples.
@@ -434,40 +433,44 @@ class Client:
         arr = np.frombuffer(package.data, dtype=dt)
         return arr["real"] + 1.0j * arr["imag"]
 
-    def _make_experiment_folder(self, experiment_name: str, config: dict) -> str:
-        """Create a timestamped experiment directory and save the config in it.
+    def _make_timestamped_experiment_directory(self, dir_name: str) -> str:
+        """Create a timestamped directory in the experiment_output dir.
 
-        :param experiment_name: name of the experiment.
-        :type experiment_name: str
-        :param config: experiment configuration to save as config.json.
-        :type config: dict
+        :param dir_name: name of the directory.
+        :type dir_name: str
         :return: path of the created directory.
         :rtype: str
         """
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        dir_name = f"experiment_output/{experiment_name}/experiment_{timestamp}"
-        os.makedirs(dir_name, exist_ok=False)
-        with open(os.path.join(dir_name, "config.json"), "w") as f:
-            json.dump(config, f, indent=2, default=str)
-        return dir_name
+        base_name = f"experiment_output/{dir_name}/experiment_{timestamp}"
+        # two runs can start within the same second: suffix the directory until one is free
+        candidate = base_name
+        index = 1
+        while True:
+            try:
+                os.makedirs(candidate)
+                return candidate
+            except FileExistsError:
+                candidate = f"{base_name}_{index}"
+                index += 1
 
-    def _save_experiment(self, df: pd.DataFrame, dir_name: str, end_message: Message) -> None:
-        """Save the experiment data (pickle) and the end message.
-
-        :param df: experiment data to save.
-        :type df: pd.DataFrame
-        :param dir_name: experiment directory.
-        :type dir_name: str
-        :param end_message: server message with the experiment summary.
-        :type end_message: Message
+    def _make_subdirectory(self, base_dir: str, subdir_name: str) -> str:
         """
-        # Save DataFrame (can use Parquet or HDF5 for efficiency)
-        df.to_pickle(os.path.join(dir_name, "data.pkl"))
-        with open(os.path.join(dir_name, "end_message.json"), "w") as f:
-            json.dump(end_message.header, f, indent=2, default=str)
+        Make a sub-directory within a base directory.
+
+        :param base_dir: Base directory name
+        :type base_dir: str
+        :param subdir_name: Name of the subdirectory to be created
+        :type subdir_name: str
+        :return: Path to the folder
+        :rtype: str
+        """
+        directory = f"{base_dir}/{subdir_name}"
+        os.makedirs(directory, exist_ok=True)
+        return directory
 
     def _save_dict(self, d: dict, dir_name: str, file_name: str) -> None:
-        """Save a dict as JSON in the experiment directory.
+        """Save a dict as JSON in a directory.
 
         :param d: dict to save.
         :type d: dict
@@ -476,8 +479,8 @@ class Client:
         :param file_name: name of the JSON file (without extension).
         :type file_name: str
         """
-        with open(os.path.join(dir_name, f"{file_name}.json"), "w") as f:
-            json.dump(d, f, indent=2, default=str)
+        with open(os.path.join(dir_name, f"{file_name}.yaml"), "w") as f:
+            yaml.dump(d, f, indent=2)
 
     def _save_dataframe(self, df: pd.DataFrame, dir_name: str, file_name: str) -> None:
         """Save a DataFrame as pickle in the experiment directory.
@@ -491,3 +494,4 @@ class Client:
         """
         # Save DataFrame (can use Parquet or HDF5 for efficiency)
         df.to_pickle(os.path.join(dir_name, f"{file_name}.pkl"))
+        df.to_csv(os.path.join(dir_name, f"{file_name}.csv"))
