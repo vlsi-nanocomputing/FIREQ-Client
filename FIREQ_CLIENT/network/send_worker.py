@@ -1,9 +1,9 @@
 """Threaded sender worker."""
 
 import logging
-import queue
 import socket
-import threading
+from queue import Empty, Queue
+from threading import Event, Thread, current_thread
 
 from .protocol import Message
 
@@ -19,10 +19,10 @@ class SendWorker:
         :type sock: socket.socket
         """
         self._sock = sock
-        self._queue = queue.Queue()
+        self._queue = Queue()
         self.log = logger or logging.getLogger(__name__)
-        self._stop_event = threading.Event()
-        self._thread = threading.Thread(target=self._sender_loop, daemon=True)
+        self._stop_event = Event()
+        self._thread = Thread(target=self._sender_loop, daemon=True)
 
     def start(self) -> None:
         """Start the background sending thread."""
@@ -36,7 +36,9 @@ class SendWorker:
         :type timeout: float | None
         """
         self._stop_event.set()
-        self._thread.join(timeout)
+        # the worker calls this on its way out, and a thread cannot join itself
+        if current_thread() is not self._thread:
+            self._thread.join(timeout)
 
     def send(self, message: Message) -> None:
         """Enqueue a message to be sent by the background thread.
@@ -51,7 +53,7 @@ class SendWorker:
         while not self._stop_event.is_set():
             try:
                 msg = self._queue.get(timeout=0.5)  # periodically check stop flag
-            except queue.Empty:
+            except Empty:
                 continue
 
             # send the message on the socket

@@ -4,7 +4,7 @@ import logging
 import socket
 import struct
 from queue import Queue
-from threading import Event, Thread
+from threading import Event, Thread, current_thread
 
 import msgpack
 
@@ -38,7 +38,9 @@ class ReceiveWorker:
         :type timeout: float | None
         """
         self._stop_event.set()
-        self._thread.join(timeout)
+        # the worker calls this on its way out, and a thread cannot join itself
+        if current_thread() is not self._thread:
+            self._thread.join(timeout)
 
     def get_message(self, block: bool = True, timeout: float | None = None) -> Message:
         """Retrieve the next message from the queue.

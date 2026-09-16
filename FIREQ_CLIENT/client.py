@@ -73,7 +73,7 @@ class Client:
                 if cmd.lower() in ("quit", "exit"):
                     break
                 self._dispatch_command(cmd)
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
             pass
         finally:
             self._disconnect()
@@ -442,9 +442,17 @@ class Client:
         :rtype: str
         """
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        dir_name = f"experiment_output/{dir_name}/experiment_{timestamp}"
-        os.makedirs(dir_name, exist_ok=False)
-        return dir_name
+        base_name = f"experiment_output/{dir_name}/experiment_{timestamp}"
+        # two runs can start within the same second: suffix the directory until one is free
+        candidate = base_name
+        index = 1
+        while True:
+            try:
+                os.makedirs(candidate)
+                return candidate
+            except FileExistsError:
+                candidate = f"{base_name}_{index}"
+                index += 1
 
     def _make_subdirectory(self, base_dir: str, subdir_name: str) -> str:
         """
