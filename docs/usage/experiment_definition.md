@@ -134,6 +134,21 @@ When a parameter is declared or modified through a YAML configuration, it remain
 
 Below is a complete specification incorporating preprocess variables, dynamic sweep parameter references, pulse definitions, and timing delays:
 
+This example performs a two-dimensional readout sweep over frequency and pulse gain. For
+each sweep point, FIREQ:
+
+- generates a 1 µs rectangular readout pulse;
+- sweeps the readout frequency from 2 to 3 GHz over 50 points;
+- sweeps the normalized pulse gain from 0.05 to 0.5 over 20 points;
+- demodulates the acquired signal at the same swept frequency;
+- accumulates the resulting I/Q samples over a 1.5 µs acquisition window;
+- compensates for a 160 ns time-of-flight delay;
+- repeats the measurement for 1000 shots;
+- uses a 102 µs experiment repetition period.
+
+Using `#freq` in both the generator and acquisition configuration means the signal is
+coherently demodulated at the same frequency used for excitation.
+
 ```yaml
 preprocess:
   RO_TIME: 1500
@@ -185,6 +200,62 @@ sys_config:
         _index: 1
         $delay: 100
 ```
+
+  ### Expected output
+
+  The two sweeps produce 50 × 20 = 1000 acquisition points. For the acquisition node in
+  this example, the client creates one directory containing a `.pkl` and a `.csv` for each
+  point, plus a run summary and timing file:
+
+  ```text
+  experiment_output/<experiment_name>/experiment_<timestamp>/
+  ├── axisAcquisitionIP_0/
+  │   ├── data_0_0.pkl
+  │   ├── data_0_0.csv
+  │   ├── ...
+  │   ├── data_49_19.pkl
+  │   └── data_49_19.csv
+  ├── experiment_summary.yaml
+  └── runtimes.yaml
+  ```
+
+  There are 1000 `.pkl`/`.csv` pairs in `axisAcquisitionIP_0/`. The numbers in each
+  filename are sweep indices in the order recorded as `var_order` in
+  `experiment_summary.yaml` (for this example, frequency and gain). The summary also
+  contains the corresponding sweep values. Each `.pkl` stores the per-point dataframe;
+  the `.csv` stores the same dataframe in text form. Its columns are:
+
+  | Column | Meaning in this experiment |
+  | :--- | :--- |
+  | `shot` | Shot index, from 0 to 999. |
+  | `time` | Sample index within a shot. It is 0 for every row because `accumulated` mode returns one integrated sample per shot, rather than a time trace. |
+  | `value` | Complex acquired sample (`I + jQ`) for that shot, accumulated over the 1.5 µs acquisition window. |
+
+  The `shot` and `time` columns come from the dataframe index and are included in the CSV
+  when it is written. `runtimes.yaml` records the total sweep time reported by the server.
+
+  ### Plotting this experiment
+
+  To plot the two-dimensional sweep, first export the run from the client prompt, then start
+  the plotter and select the acquired magnitude with frequency and gain as the heatmap axes:
+
+  ```text
+  export experiment_output/<experiment_name>/experiment_<timestamp>/ exported/<experiment_name>/
+  ```
+
+  ```bash
+  python run_plotter.py
+  ```
+
+  ```text
+  plot_3d_heat exported/<experiment_name>/
+  ```
+
+  In the plotter controls, choose `magnitude` as the quantity, `freq` for one axis, and
+  `gain` for the other. The figure below is a placeholder; replace it with the plot produced
+  from an actual experiment run.
+
+  ![Placeholder for the frequency-versus-gain readout heatmap](images/readout_sweep_plot_placeholder.svg)
 
 ## Running an experiment
 
