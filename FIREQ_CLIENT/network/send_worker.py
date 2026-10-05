@@ -23,6 +23,8 @@ class SendWorker:
         self.log = logger or logging.getLogger(__name__)
         self._stop_event = Event()
         self._thread = Thread(target=self._sender_loop, daemon=True)
+        # flag to know if the socket object has the sendmsg method
+        self._has_sendmsg = hasattr(self._sock, "sendmsg")
 
     def start(self) -> None:
         """Start the background sending thread."""
@@ -55,13 +57,22 @@ class SendWorker:
                 msg = self._queue.get(timeout=0.5)  # periodically check stop flag
             except Empty:
                 continue
-
             # send the message on the socket
-            try:
-                self._sock.sendmsg(msg.to_buffers())
-            except Exception as e:
-                self.log.exception(f"Caught an exception while sending packet: {e}")
-                break
+            if self._has_sendmsg:
+                # sendmsg may do a partial send, so loop until everything is out
+                buffers = [memoryview(b) for b in msg.to_buffers()]
+                while buffers:
+                    sent = self._sock.sendmsg(buffers)
+                    while sent and buffers:
+                        if sent >= len(buffers[0]):
+                            sent -= len(buffers[0])
+                            buffers.pop(0)
+                        else:
+                            buffers[0] = buffers[0][sent:]
+                            sent = 0
+            else:
+                # Windows and other platforms without sendmsg
+                self._sock.sendall(b"".join(buffers))
             self._queue.task_done()
         # stop if the stop event is not set
         if not self._stop_event.is_set():
