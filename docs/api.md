@@ -22,7 +22,7 @@ A standard client runtime lifecycle proceeds as follows:
 2. **Handshake & Auth**: Performs authentication via shared token validation.
 3. **YAML Preprocessing**: Loads `.yaml` experiment definitions and resolves internal variable placeholders.
 4. **Command Execution**: Dispatches execution requests.
-5. **Data Streaming & Export**: Listens for inbound binary DMA frames, converts complex IQ payloads into structured data, and saves them locally as JSON/Pickle files. The client `export` command creates the single-`data.pkl` format consumed by the separate `FIREQ_PLOTTER` package.
+5. **Data Streaming & Export**: Listens for inbound binary DMA frames, converts complex IQ payloads into structured data, and saves them locally as YAML, pickle and CSV files. The client `export` command writes, per acquisition IP, a `data_<acquisition_ip_name>.pkl` dataframe and its matching `.csv` into the target directory, next to a copy of `experiment_summary.yaml`. This is the directory layout consumed by the separate `FIREQ_PLOTTER` package.
 
 ---
 
@@ -64,7 +64,6 @@ For detailed class and function signatures, select one of the submodules below:
    :toctree: _autosummary
    :nosignatures:
 
-   FIREQ_CLIENT.data
    FIREQ_CLIENT.export
 
 .. rubric:: Plotting
@@ -74,8 +73,10 @@ For detailed class and function signatures, select one of the submodules below:
    :nosignatures:
 
    FIREQ_PLOTTER.plotter.CommandCompleter
+   FIREQ_PLOTTER.plotter.main
+   FIREQ_PLOTTER.plotting.common.load_and_plot
    FIREQ_PLOTTER.plotting.plot_2d._plot_2d
    FIREQ_PLOTTER.plotting.plot_3d_heatmap._plot_3d_heatmap
-   FIREQ_PLOTTER.plotting.plot_iq._plot_iq
-   FIREQ_PLOTTER.plotting.plot_spectr._plot_spectr
+   FIREQ_PLOTTER.plotting.plot_iq._plot_iq_curve
+   FIREQ_PLOTTER.plotting.plot_iq._plot_rotated_cdf
 ```

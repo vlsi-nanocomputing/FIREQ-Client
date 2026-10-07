@@ -51,7 +51,7 @@ def main() -> None:
 
     # run the server
     client = Client(server_ip, server_port)
-    client.run()
+    client.start()
 
 
 if __name__ == "__main__":
