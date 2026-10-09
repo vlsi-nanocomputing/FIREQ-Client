@@ -1,0 +1,28 @@
+# Hardware description for FIREQ_GUI (File -> Load hardware description).
+# Same fields as an entry of FIREQ_GUI/core/boards.json. Fields that are not given are taken
+# from the "base" board. In the future FIREQ-Server will send this description itself, either
+# in the handshake ({"type": "handshake", "hardware": {...}}) or as the answer to
+# {"cmd": "get_hardware"} -> {"type": "hardware", "hardware": {...}}.
+
+key: zcu216_lab              # name shown in the board list
+base: ZCU216                 # start from the built-in ZCU216 profile
+title: ZCU216 (lab bitstream)
+generators: 4                # axisGeneratorIP_0..3
+acquisitions: 4              # axisAcquisitionIP_0..3
+trigger_channels: 15
+frequency_mux: true
+trigger_clock_mhz: 583.68    # timeline tick = 1 / 583.68 MHz = 1.713 ns
+dac_fs_mhz: 9338.88
+adc_fs_mhz: 2334.72
+
+# Optional: replace the channel lists of the base board.
+# crossbar_bit: bit of _dac_target that reaches the DAC (null = not routed)
+# acq_ips: acquisition IPs fed by the ADC (null = any, [] = not routed)
+dacs:
+  - {tile: 228, block: 0, crossbar_bit: 0}
+  - {tile: 228, block: 1, crossbar_bit: 1}
+  - {tile: 229, block: 0, crossbar_bit: 2}
+  - {tile: 229, block: 1, crossbar_bit: 3}
+adcs:
+  - {tile: 224, block: 0, acq_ips: [0, 1]}
+  - {tile: 225, block: 0, acq_ips: [2, 3]}

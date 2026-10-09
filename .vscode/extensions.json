@@ -3,7 +3,6 @@
   // for the documentation about the extensions.json format
   "recommendations": [
     "ms-python.python",
-    "astral-sh.ruff",
-    "gitlab.gitlab-workflow"
+    "astral-sh.ruff"
   ]
 }

@@ -40,11 +40,13 @@ firmware repositories.
 FIREQ-Client/
 ├── FIREQ_CLIENT/                                    Python client package
 ├── FIREQ_PLOTTER/                                   Plotting utilities and REPL
+├── FIREQ_GUI/                                       PyQt6 experiment designer and live viewer
 ├── yaml_experiment_configurations_examples/         Example experiment YAML configurations
 ├── testing/                                         Test scripts
 ├── docs/                                            Client-specific documentation
 ├── run_client.py                                    Minimal client entry point
 ├── run_plotter.py                                   Plotter entry point
+├── run_gui.py                                       Graphical interface entry point
 ├── requirements.txt                                 Python dependencies
 └── README.md
 ```
@@ -82,10 +84,12 @@ Upgrade `pip` inside the virtual environment:
 python -m pip install --upgrade pip
 ```
 
-Install the required dependencies:
+Install the required dependencies, either for the command-line client only or for the client with the graphical
+interface (Python >= 3.10; the boards run 3.10.4, see `docs/installation.md` for a Miniconda setup):
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.txt        # client only
+python -m pip install -r requirements-gui.txt    # client + GUI
 ```
 
 ## Quick start
@@ -95,6 +99,21 @@ A minimal client execution can be started with:
 ```bash
 python run_client.py
 ```
+
+### Graphical interface
+
+`FIREQ_GUI` is a PyQt6 experiment designer built on top of the client core. The shot is
+edited as a multi-track timeline (one track per converter channel, e.g. `DAC 228_0`,
+`DAC 229_0`, `ADC 224_0`) with drag-and-drop pulse blocks, frequency-multiplexed readout
+tones and acquisition windows delayed by the time of flight, all on the 1.713 ns trigger
+grid. It generates the experiment YAML, runs it and lets you browse and plot the acquired data.
+
+```bash
+python run_gui.py                       # or: python run_gui.py my_experiment.yaml
+python -m FIREQ_GUI.tools.mock_server   # simulated server on 127.0.0.1:5000 for testing
+```
+
+Details in `docs/usage/gui.md`.
 
 Example experiment YAML configurations are available in:
 

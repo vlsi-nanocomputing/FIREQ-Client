@@ -1,0 +1,3 @@
+-r requirements.txt
+PyQt6>=6.5
+pyqtgraph>=0.13.3

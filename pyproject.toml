@@ -12,18 +12,26 @@ name = "fireq-client"
 version = "0.1.0"
 requires-python = ">=3.10"
 
-# Runtime dependencies, aligned with requirements.txt
+# Runtime dependencies, aligned with requirements.txt.
+# The boards run Python 3.10, so pandas stays on 2.x (3.x needs Python >= 3.11)
+# and matplotlib below 3.11.
 dependencies = [
-  "matplotlib==3.11.0",
+  "matplotlib>=3.9,<3.11",
   "msgpack==1.2.1",
   "numpy==1.26.4",
-  "pandas==3.0.3",
+  "pandas>=2.2,<3",
   "prompt_toolkit==3.0.52",
   "PyYAML==6.0.3",
   "tqdm==4.67.3",
 ]
 
 [project.optional-dependencies]
+# Graphical experiment designer (FIREQ_GUI, run with `python run_gui.py`),
+# aligned with requirements-gui.txt; install with `pip install -e ".[gui]"`
+gui = [
+  "PyQt6>=6.5",
+  "pyqtgraph>=0.13.3",
+]
 # Development tools
 dev = [
   "black>=25.12.0",

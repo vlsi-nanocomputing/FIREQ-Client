@@ -78,4 +78,47 @@ For detailed class and function signatures, select one of the submodules below:
    FIREQ_PLOTTER.plotting.plot_3d_heatmap._plot_3d_heatmap
    FIREQ_PLOTTER.plotting.plot_iq._plot_iq
    FIREQ_PLOTTER.plotting.plot_spectr._plot_spectr
+
+.. rubric:: Experiment designer GUI: core (no Qt)
+
+.. autosummary::
+   :toctree: _autosummary
+   :nosignatures:
+
+   FIREQ_GUI.core.model
+   FIREQ_GUI.core.boards
+   FIREQ_GUI.core.envelopes
+   FIREQ_GUI.core.expressions
+   FIREQ_GUI.core.yaml_export
+   FIREQ_GUI.core.yaml_import
+   FIREQ_GUI.core.validation
+   FIREQ_GUI.core.session
+   FIREQ_GUI.core.plot_actions
+
+.. rubric:: Experiment designer GUI: Qt widgets (needs PyQt6 and pyqtgraph, or ``autodoc_mock_imports``)
+
+.. autosummary::
+   :toctree: _autosummary
+   :nosignatures:
+
+   FIREQ_GUI.gui.main_window
+   FIREQ_GUI.gui.timeline
+   FIREQ_GUI.gui.timeline_editor
+   FIREQ_GUI.gui.inspector
+   FIREQ_GUI.gui.experiment_panel
+   FIREQ_GUI.gui.board_view
+   FIREQ_GUI.gui.results_browser
+   FIREQ_GUI.gui.qt_session
+   FIREQ_GUI.gui.widgets
+   FIREQ_GUI.gui.qt
+   FIREQ_GUI.gui.app
+
+.. rubric:: Experiment designer GUI: tools
+
+.. autosummary::
+   :toctree: _autosummary
+   :nosignatures:
+
+   FIREQ_GUI.tools.mock_server
+   FIREQ_GUI.tools.plot_runner
 ```

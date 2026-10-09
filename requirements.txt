@@ -1,7 +1,7 @@
-matplotlib==3.11.0
+matplotlib>=3.9,<3.11
 msgpack==1.2.1
 numpy==1.26.4
-pandas==3.0.3
+pandas>=2.2,<3
 prompt_toolkit==3.0.52
 PyYAML==6.0.3
 tqdm==4.67.3

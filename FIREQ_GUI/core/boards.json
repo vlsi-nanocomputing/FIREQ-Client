@@ -1,0 +1,249 @@
+{
+  "_comment": [
+    "Board profiles used by the FIREQ GUI.",
+    "Channels are named as in the AMD RF Data Converter: <tile>_<block> (e.g. DAC 228_0).",
+    "sma: label printed on the board next to the SMA connector (if any).",
+    "crossbar_bit: bit of _dac_target (crossbar output) that reaches this DAC with the current bitstream; null = not routed.",
+    "acq_ips: acquisition IP indices that receive this ADC; null = unknown/any, [] = not routed.",
+    "trigger_clock_mhz: clock of the trigger generator; one tick = 1/trigger_clock_mhz us is the timeline resolution.",
+    "Entries marked 'verify' must be checked against the board and the overlay .hwh file."
+  ],
+  "boards": {
+    "RFSoC4x2": {
+      "title": "RFSoC 4x2",
+      "generators": 2,
+      "acquisitions": 2,
+      "trigger_channels": 15,
+      "frequency_mux": false,
+      "dac_fs_mhz": 9338.88,
+      "adc_fs_mhz": 4669.44,
+      "trigger_clock_mhz": 583.68,
+      "raw_buffer_samples": 16384,
+      "dacs": [
+        {
+          "tile": 228,
+          "block": 0,
+          "sma": "DAC_B",
+          "crossbar_bit": 0,
+          "note": "verify"
+        },
+        {
+          "tile": 230,
+          "block": 0,
+          "sma": "DAC_A",
+          "crossbar_bit": 1,
+          "note": "verify"
+        }
+      ],
+      "adcs": [
+        {
+          "tile": 224,
+          "block": 0,
+          "sma": "ADC_D",
+          "acq_ips": [
+            0
+          ],
+          "note": "verify"
+        },
+        {
+          "tile": 224,
+          "block": 1,
+          "sma": "ADC_C",
+          "acq_ips": [],
+          "note": "not routed in current overlay (verify)"
+        },
+        {
+          "tile": 226,
+          "block": 0,
+          "sma": "ADC_B",
+          "acq_ips": [
+            1
+          ],
+          "note": "verify"
+        },
+        {
+          "tile": 226,
+          "block": 1,
+          "sma": "ADC_A",
+          "acq_ips": [],
+          "note": "not routed in current overlay (verify)"
+        }
+      ]
+    },
+    "ZCU216": {
+      "title": "ZCU216",
+      "generators": 2,
+      "acquisitions": 2,
+      "trigger_channels": 15,
+      "frequency_mux": true,
+      "dac_fs_mhz": 9338.88,
+      "adc_fs_mhz": 2334.72,
+      "trigger_clock_mhz": 583.68,
+      "raw_buffer_samples": 16384,
+      "dacs": [
+        {
+          "tile": 228,
+          "block": 0,
+          "crossbar_bit": 0
+        },
+        {
+          "tile": 228,
+          "block": 1,
+          "crossbar_bit": 1
+        },
+        {
+          "tile": 228,
+          "block": 2,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 228,
+          "block": 3,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 229,
+          "block": 0,
+          "crossbar_bit": 2
+        },
+        {
+          "tile": 229,
+          "block": 1,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 229,
+          "block": 2,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 229,
+          "block": 3,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 230,
+          "block": 0,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 230,
+          "block": 1,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 230,
+          "block": 2,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 230,
+          "block": 3,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 231,
+          "block": 0,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 231,
+          "block": 1,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 231,
+          "block": 2,
+          "crossbar_bit": null
+        },
+        {
+          "tile": 231,
+          "block": 3,
+          "crossbar_bit": null
+        }
+      ],
+      "adcs": [
+        {
+          "tile": 224,
+          "block": 0,
+          "acq_ips": null
+        },
+        {
+          "tile": 224,
+          "block": 1,
+          "acq_ips": []
+        },
+        {
+          "tile": 224,
+          "block": 2,
+          "acq_ips": []
+        },
+        {
+          "tile": 224,
+          "block": 3,
+          "acq_ips": []
+        },
+        {
+          "tile": 225,
+          "block": 0,
+          "acq_ips": null
+        },
+        {
+          "tile": 225,
+          "block": 1,
+          "acq_ips": []
+        },
+        {
+          "tile": 225,
+          "block": 2,
+          "acq_ips": []
+        },
+        {
+          "tile": 225,
+          "block": 3,
+          "acq_ips": []
+        },
+        {
+          "tile": 226,
+          "block": 0,
+          "acq_ips": []
+        },
+        {
+          "tile": 226,
+          "block": 1,
+          "acq_ips": []
+        },
+        {
+          "tile": 226,
+          "block": 2,
+          "acq_ips": []
+        },
+        {
+          "tile": 226,
+          "block": 3,
+          "acq_ips": []
+        },
+        {
+          "tile": 227,
+          "block": 0,
+          "acq_ips": []
+        },
+        {
+          "tile": 227,
+          "block": 1,
+          "acq_ips": []
+        },
+        {
+          "tile": 227,
+          "block": 2,
+          "acq_ips": []
+        },
+        {
+          "tile": 227,
+          "block": 3,
+          "acq_ips": []
+        }
+      ]
+    }
+  }
+}
