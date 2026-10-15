@@ -46,7 +46,7 @@ from .qt import (
 )
 from .qt_session import SessionBridge
 from .timeline_editor import TimelineEditor
-from .widgets import NameRegistry, ParamEdit
+from .widgets import MessageBox, NameRegistry, ParamEdit
 
 PROJECT_FILTER = "FIREQ GUI project (*.fireq.json);;JSON (*.json)"
 YAML_FILTER = "FIREQ experiment (*.yaml *.yml)"
@@ -75,7 +75,7 @@ class MainWindow(QMainWindow):
         self.issues = []
 
         self.setWindowTitle("FIREQ – Experiment designer")
-        self.resize(1680, 980)
+        self._fit_to_screen(1680, 980)
         self.bridge = SessionBridge(self)
         # build the ui: actions/menus, toolbar, timeline, docks, then session signals
         self._build_actions()
@@ -96,6 +96,9 @@ class MainWindow(QMainWindow):
         geo = self.settings.value("geometry")
         if geo is not None:
             self.restoreGeometry(geo)
+            # the saved geometry may come from a larger screen or a smaller font
+            if not self.isMaximized():
+                self._fit_to_screen(self.width(), self.height())
         state = self.settings.value("state")
         if state is not None:
             self.restoreState(state)
@@ -103,6 +106,26 @@ class MainWindow(QMainWindow):
         # fit the timeline once the window has been laid out
         QTimer.singleShot(0, self.timeline.view.fit)
         self.statusBar().showMessage("Ready. Connect to the FIREQ server from the toolbar to run experiments.")
+
+    def _fit_to_screen(self, w: int, h: int) -> None:
+        """Resize the window, keeping it inside the available area of its screen.
+
+        :param w: wanted width.
+        :type w: int
+        :param h: wanted height.
+        :type h: int
+        """
+        screen = self.screen() or QApplication.primaryScreen()
+        if screen is None:
+            self.resize(w, h)
+            return
+        avail = screen.availableGeometry()
+        # leave room for the window manager frame
+        self.resize(min(w, avail.width() - 40), min(h, avail.height() - 60))
+        g = self.frameGeometry()
+        if not avail.contains(g):
+            g.moveCenter(avail.center())
+            self.move(g.topLeft())
 
     # ------------------------------------------------------------------ UI construction
     def _act(self, text: str, slot: Callable[[], object], shortcut: object = None, tip: str = "") -> QAction:
@@ -190,7 +213,7 @@ class MainWindow(QMainWindow):
         # server connection fields, initialised from the saved settings
         tb.addWidget(QLabel(" Server "))
         self.host = QLineEdit(str(self.settings.value("host", "192.168.2.99")))
-        self.host.setFixedWidth(130)
+        self.host.setFixedWidth(self.fontMetrics().horizontalAdvance("255.255.255.255") + 16)
         self.host.setToolTip("IP address of the FIREQ server (board)")
         tb.addWidget(self.host)
         tb.addWidget(QLabel(":"))
@@ -201,7 +224,7 @@ class MainWindow(QMainWindow):
         tb.addWidget(QLabel(" token "))
         self.token = QLineEdit(str(self.settings.value("token", "fireq")))
         self.token.setEchoMode(QLineEdit.EchoMode.Password)
-        self.token.setFixedWidth(80)
+        self.token.setFixedWidth(self.fontMetrics().averageCharWidth() * 10 + 16)
         tb.addWidget(self.token)
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.setCheckable(True)
@@ -485,7 +508,7 @@ class MainWindow(QMainWindow):
         try:
             key, desc = load_hardware_file(path)
         except Exception as e:  # noqa: BLE001
-            QMessageBox.critical(self, "Hardware description", f"Cannot read {path}:\n{e}")
+            MessageBox.critical(self, "Hardware description", f"Cannot read {path}:\n{e}")
             return
         self.apply_hardware(key, desc, f"file {Path(path).name}")
 
@@ -538,7 +561,7 @@ class MainWindow(QMainWindow):
         try:
             exp, warns = import_yaml_file(path, board=self.exp.board)
         except Exception as e:  # noqa: BLE001
-            QMessageBox.critical(self, "Error", f"Cannot open {path}:\n{e}")
+            MessageBox.critical(self, "Error", f"Cannot open {path}:\n{e}")
             return
         # name the project after the experiment folder
         exp.name = Path(path).parent.parent.name or exp.name
@@ -580,7 +603,7 @@ class MainWindow(QMainWindow):
         # nothing to lose if the model matches the saved json
         if self.exp.to_json() == self.saved_json:
             return True
-        r = QMessageBox.question(
+        r = MessageBox.question(
             self, "Unsaved changes", "The current project has unsaved changes. Continue?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return r == QMessageBox.StandardButton.Yes
@@ -617,7 +640,7 @@ class MainWindow(QMainWindow):
         try:
             exp = Experiment.from_json(Path(path).read_text(encoding="utf-8"))
         except Exception as e:  # noqa: BLE001
-            QMessageBox.critical(self, "Error", f"Cannot open the project:\n{e}")
+            MessageBox.critical(self, "Error", f"Cannot open the project:\n{e}")
             return
         self.settings.setValue("last_dir", str(Path(path).parent))
         self.project_path = path
@@ -671,7 +694,7 @@ class MainWindow(QMainWindow):
             # convert the yaml to an experiment, collecting warnings
             exp, warns = import_yaml_file(path, board=self.exp.board)
         except Exception as e:  # noqa: BLE001
-            QMessageBox.critical(self, "Error", f"Cannot import the file:\n{e}")
+            MessageBox.critical(self, "Error", f"Cannot import the file:\n{e}")
             return
         self.settings.setValue("last_dir", str(Path(path).parent))
         # an imported yaml is not a project file yet
@@ -748,7 +771,7 @@ class MainWindow(QMainWindow):
         # ask before running a configuration with errors
         errors = [i for i in self.issues if i.level == ERROR]
         if errors:
-            r = QMessageBox.warning(
+            r = MessageBox.warning(
                 self,
                 "Configuration errors",
                 "The checks found errors:\n\n" + "\n".join(f"• {i.where}: {i.message}" for i in errors[:10]) + "\n\nRun anyway?",
@@ -758,7 +781,7 @@ class MainWindow(QMainWindow):
                 self.right_tabs.setCurrentIndex(TAB_CHECKS)
                 return
         if not self.bridge.connected:
-            QMessageBox.information(self, "Server", "Connect to the FIREQ server first.")
+            MessageBox.information(self, "Server", "Connect to the FIREQ server first.")
             return
         # write the yaml to experiments/ in the working folder and run it
         out_dir = Path(os.getcwd()) / "experiments"
@@ -790,7 +813,7 @@ class MainWindow(QMainWindow):
         """
         # offer to save unsaved changes; Cancel or a cancelled save keeps the window open
         if self.exp.to_json() != self.saved_json:
-            r = QMessageBox.question(
+            r = MessageBox.question(
                 self,
                 "Quit",
                 "Save the project before quitting?",

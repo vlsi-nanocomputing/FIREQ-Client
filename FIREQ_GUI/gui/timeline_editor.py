@@ -8,12 +8,12 @@ from collections.abc import Callable
 from ..core.model import DriveBlock, Experiment, ReadoutTrack, Tone, new_id, unique_name
 from .qt import (
     QCheckBox,
-    QHBoxLayout,
     QLabel,
     QMenu,
     QSlider,
     QSplitter,
     Qt,
+    QToolBar,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -40,22 +40,24 @@ class TimelineEditor(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
 
-        # toolbar: add-track menus, block operations, snap and zoom, sweep preview
-        bar = QHBoxLayout()
-        bar.setContentsMargins(6, 4, 6, 2)
+        # toolbar: add-track menus, block operations, snap and zoom, sweep preview;
+        # a QToolBar moves what does not fit into its » menu instead of forcing
+        # a minimum width on the window (large fonts, small screens)
+        bar = QToolBar()
+        bar.setContentsMargins(6, 0, 6, 0)
         self.btn_drive = self._menu_button("+ Drive track", "Add a drive track on a DAC channel", self._fill_dac_menu_drive)
         self.btn_ro = self._menu_button("+ Readout track", "Add a readout track on a DAC channel", self._fill_dac_menu_ro)
         self.btn_acq = self._menu_button("+ Acquisition track", "Add an acquisition track on an ADC channel", self._fill_adc_menu)
         for b in (self.btn_drive, self.btn_ro, self.btn_acq):
             bar.addWidget(b)
-        bar.addSpacing(10)
+        bar.addSeparator()
         self.btn_tone = self._button("+ Tone", "Add a multiplexed tone to the selected readout track", self.add_tone)
         self.btn_copy = self._button("Copy to acquisition", "Create the acquisition window of the selected tone (delayed by the time of flight)", self.copy_selected)
         self.btn_dup = self._button("Duplicate", "Duplicate the selected block (Ctrl+D)", lambda: self.duplicate(self.view.selected_id, False))
         self.btn_del = self._button("Delete", "Delete the selected block or track (Del)", lambda: self.delete(self.view.selected_id))
         for b in (self.btn_tone, self.btn_copy, self.btn_dup, self.btn_del):
             bar.addWidget(b)
-        bar.addSpacing(10)
+        bar.addSeparator()
         self.snap = QCheckBox("Snap to tick")
         self.snap.setChecked(True)
         self.snap.toggled.connect(self._set_snap)
@@ -63,21 +65,20 @@ class TimelineEditor(QWidget):
         bar.addWidget(self._button("−", "Zoom out (Ctrl+wheel)", lambda: self.view.set_scale(self.view.scale_x * 0.8)))
         bar.addWidget(self._button("+", "Zoom in (Ctrl+wheel)", lambda: self.view.set_scale(self.view.scale_x * 1.25)))
         bar.addWidget(self._button("Fit", "Show the whole shot", lambda: self.view.fit()))
-        bar.addSpacing(10)
+        bar.addSeparator()
         bar.addWidget(QLabel("Sweep preview"))
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(0, 100)
-        self.slider.setFixedWidth(120)
+        self.slider.setFixedWidth(self.fontMetrics().averageCharWidth() * 16)
         self.slider.setToolTip("Point of the sweep used to draw values that depend on #variables")
         self.slider.valueChanged.connect(self._preview_moved)
         bar.addWidget(self.slider)
         self.sweep_label = QLabel()
         self.sweep_label.setStyleSheet("color:#2f6fdf;")
         bar.addWidget(self.sweep_label)
-        bar.addStretch(1)
         self.cursor_label = QLabel()  # shown in the main window status bar
         self.cursor_label.setStyleSheet("color:#5b6472; font-family: monospace;")
-        lay.addLayout(bar)
+        lay.addWidget(bar)
 
         # palette on the left, timeline view taking the remaining width
         split = QSplitter(Qt.Orientation.Horizontal)
@@ -89,7 +90,7 @@ class TimelineEditor(QWidget):
         self.view.hoverTime.connect(self._hover)
         split.addWidget(self.view)
         split.setStretchFactor(1, 1)
-        split.setSizes([150, 1200])
+        split.setSizes([self.palette.maximumWidth(), 1200])
         lay.addWidget(split, 1)
 
     # ------------------------------------------------------------------ helpers

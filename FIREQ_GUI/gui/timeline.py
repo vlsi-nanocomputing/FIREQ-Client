@@ -35,6 +35,7 @@ from .qt import (
     QDragMoveEvent,
     QDropEvent,
     QFont,
+    QFontMetricsF,
     QGraphicsItem,
     QGraphicsPathItem,
     QGraphicsRectItem,
@@ -62,13 +63,50 @@ from .qt import (
 )
 
 MIME = "application/x-fireq-block"
+# track geometry in pixels for the default font; _fit_font() scales it to the font in use
 HEADER_W = 150
 RULER_H = 30
 LANE_H = 30
 DRIVE_H = 70
 TRACK_PAD = 6
+LINE_H = 17  # height of a line of text in the normal and in the small font
+SMALL_H = 14
 TRACK_GAP = 4
 MIN_SCALE, MAX_SCALE = 0.02, 40.0  # px per ns
+
+
+
+def _small(font: QFont) -> QFont:
+    """Return the smaller font used for subtitles, ruler and block labels.
+
+    :param font: normal font.
+    :type font: QFont
+    :return: the small font.
+    :rtype: QFont
+    """
+    f = QFont(font)
+    f.setPointSizeF(max(f.pointSizeF() - 1.5, 7.0))
+    return f
+
+
+def _fit_font(font: QFont) -> None:
+    """Scale the track geometry so that the labels fit with the given font.
+
+    The defaults suit a 10 pt font at 96 dpi; larger fonts (or font DPI scaling) need
+    taller rows and a wider header, otherwise the painted text is clipped.
+
+    :param font: font of the timeline view.
+    :type font: QFont
+    """
+    global HEADER_W, RULER_H, LANE_H, DRIVE_H, LINE_H, SMALL_H
+    LINE_H = math.ceil(QFontMetricsF(font).height())
+    SMALL_H = math.ceil(QFontMetricsF(_small(font)).height())
+    k = max(1.0, LINE_H / 17)
+    HEADER_W = round(150 * k)
+    RULER_H = max(30, 2 * SMALL_H + 4)
+    LANE_H = max(30, SMALL_H + 16)
+    DRIVE_H = max(70, round(70 * k))
+
 
 KIND_BG = {"drive": QColor("#f7f9fc"), "readout": QColor("#f4faf7"), "acq": QColor("#f7f6f9")}
 KIND_TAG = {"drive": "DRIVE", "readout": "READOUT", "acq": "ACQUISITION"}
@@ -119,7 +157,7 @@ class BlockPalette(QListWidget):
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setToolTip("Drag a block onto a track")
-        self.setMaximumWidth(170)
+        self.setMaximumWidth(self.fontMetrics().averageCharWidth() * 24)
         self._section("Drive pulses")
         for key, label in SHAPES.items():
             self._entry(f"  {label}", f"pulse:{key}", "#2f6fdf")
@@ -276,7 +314,7 @@ class BlockItem(QGraphicsRectItem):
             env = np.ones(8, dtype=complex)
         # the envelope is drawn normalised; the gain is in the label and in the inspector
         base = r.bottom() - 4
-        amp = r.height() - 22
+        amp = r.height() - SMALL_H - 8
         if b.shape == "rect":
             xs, ys = np.array([0.0, 0.0, 1.0, 1.0]), np.array([0.0, 1.0, 1.0, 0.0])
             curves = [(xs, ys, self.color)]
@@ -309,7 +347,7 @@ class BlockItem(QGraphicsRectItem):
         # illustrative cycle count: grows with the width, varies with the frequency, bounded
         cycles = max(3.0, min(r.width() / 6.0, 4 + (f % 97) / 8))
         path = QPainterPath()
-        mid, amp = r.center().y() + 4, (r.height() - 14) / 2.8
+        mid, amp = r.center().y() + 4, (r.height() - SMALL_H) / 2.8
         n = max(int(r.width() / 2), 8)
         for k in range(n + 1):
             x = r.left() + r.width() * k / n
@@ -329,9 +367,7 @@ class BlockItem(QGraphicsRectItem):
         :type r: QRectF
         """
         exp = self.view.exp
-        f = QFont(self.view.font())
-        f.setPointSizeF(max(f.pointSizeF() - 1.5, 7.0))
-        p.setFont(f)
+        p.setFont(_small(self.view.font()))
         p.setPen(QPen(self.color.darker(160)))
         if self.kind == "drive":
             b: DriveBlock = self.item
@@ -346,7 +382,7 @@ class BlockItem(QGraphicsRectItem):
             w: AcqWindow = self.item
             _, tone = exp.tone(w.tone_id)
             text = f"acq {w.acquisition} · {tone.name if tone else '?'} · ToF {_fmt(exp.ev(w.tof))} ns · {w.output_type}"
-        p.drawText(QRectF(r.left() + 4, r.top() + 1, max(r.width() - 6, 0), 14), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, text)
+        p.drawText(QRectF(r.left() + 4, r.top() + 1, max(r.width() - 6, 0), SMALL_H), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, text)
 
     # ----------------------------------------------------------- interaction
     def _near_edge(self, x: float) -> bool:
@@ -473,6 +509,7 @@ class TimelineView(QGraphicsView):
         :type parent: QWidget | None
         """
         super().__init__(parent)
+        _fit_font(self.font())
         self.setScene(QGraphicsScene(self))
         self.exp: Experiment | None = None
         self.rows: list[TrackRow] = []
@@ -1077,7 +1114,7 @@ class TimelineView(QGraphicsView):
         :rtype: float
         """
         # smallest 1-2-5 step giving at least ~90 px between labels
-        target = 90 / self.scale_x
+        target = max(90, QFontMetricsF(_small(self.font())).horizontalAdvance("00000 ns") + 12) / self.scale_x
         for s in (1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1e6):
             if s >= target:
                 return float(s)
@@ -1146,8 +1183,8 @@ class TimelineView(QGraphicsView):
         p.resetTransform()
         vw, vh = self.viewport().width(), self.viewport().height()
         f = QFont(self.font())
-        small = QFont(f)
-        small.setPointSizeF(max(f.pointSizeF() - 1.5, 7.0))
+        small = _small(f)
+        small_fm = QFontMetricsF(small)
         # ---- headers
         p.fillRect(QRectF(0, 0, HEADER_W, vh), QColor("#eef1f5"))
         p.setPen(QPen(QColor("#cfd4dc"), 1))
@@ -1166,18 +1203,18 @@ class TimelineView(QGraphicsView):
             bold = QFont(f)
             bold.setBold(True)
             p.setFont(bold)
-            p.drawText(QRectF(12, top + 4, HEADER_W - 16, 18), Qt.AlignmentFlag.AlignLeft, tr.title)
+            p.drawText(QRectF(12, top + 4, HEADER_W - 16, LINE_H), Qt.AlignmentFlag.AlignLeft, QFontMetricsF(bold).elidedText(tr.title, Qt.TextElideMode.ElideRight, HEADER_W - 16))
             p.setFont(small)
             p.setPen(QColor("#5b6472"))
-            p.drawText(QRectF(12, top + 21, HEADER_W - 16, 14), Qt.AlignmentFlag.AlignLeft, self._subtitle(row))
+            p.drawText(QRectF(12, top + 4 + LINE_H, HEADER_W - 16, SMALL_H), Qt.AlignmentFlag.AlignLeft, small_fm.elidedText(self._subtitle(row), Qt.TextElideMode.ElideRight, HEADER_W - 16))
             # per-lane labels, only where they do not overlap the subtitle
             if row.kind != "drive":
                 for k, it in enumerate(self._row_items(row)):
                     _, obj = it
                     ly = top + TRACK_PAD + k * LANE_H
-                    if row.lanes > 1 and ly + LANE_H - 2 > top + 36:
+                    if row.lanes > 1 and ly + LANE_H - 2 > top + 6 + LINE_H + SMALL_H:
                         label = obj.name if row.kind == "readout" else f"acq {obj.acquisition}"
-                        p.drawText(QRectF(60, ly + 8, HEADER_W - 64, 14), Qt.AlignmentFlag.AlignRight, label)
+                        p.drawText(QRectF(60, ly + (LANE_H - SMALL_H) / 2, HEADER_W - 64, SMALL_H), Qt.AlignmentFlag.AlignRight, label)
             p.setPen(QPen(QColor("#d5d9e0"), 1))
             p.drawLine(QPointF(0, r.bottom() + TRACK_GAP / 2), QPointF(HEADER_W, r.bottom() + TRACK_GAP / 2))
         # ---- ruler
@@ -1196,7 +1233,7 @@ class TimelineView(QGraphicsView):
                 if x >= HEADER_W:
                     p.setPen(QColor("#4a5566"))
                     p.drawLine(QPointF(x, RULER_H - 8), QPointF(x, RULER_H - 1))
-                    p.drawText(QRectF(x + 3, 2, 90, 14), Qt.AlignmentFlag.AlignLeft, f"{t:g} ns")
+                    p.drawText(QRectF(x + 3, 1, small_fm.horizontalAdvance(f"{t:g} ns") + 4, SMALL_H), Qt.AlignmentFlag.AlignLeft, f"{t:g} ns")
                 # four minor ticks between labels
                 for m in range(1, 5):
                     xm = self.mapFromScene(QPointF(self.x_of(t + m * step / 5), 0)).x()
@@ -1214,22 +1251,22 @@ class TimelineView(QGraphicsView):
                     continue
                 col = QColor("#2f6fdf") if e.ttype == "drive" else QColor("#2a9d6f")
                 tri = QPainterPath()
-                tri.moveTo(x - 5, 16)
-                tri.lineTo(x + 5, 16)
+                tri.moveTo(x - 5, RULER_H - 14)
+                tri.lineTo(x + 5, RULER_H - 14)
                 tri.lineTo(x, RULER_H - 2)
                 tri.closeSubpath()
                 p.fillPath(tri, col)
-                if x - last_label_x > 26:  # avoid overlapping labels of close triggers
+                if x - last_label_x > small_fm.horizontalAdvance("T00") + 8:  # avoid overlapping labels of close triggers
                     p.setPen(col)
-                    p.drawText(QRectF(x + 6, 15, 40, 14), Qt.AlignmentFlag.AlignLeft, f"T{i + 1}")
+                    p.drawText(QRectF(x + 6, RULER_H - SMALL_H - 1, small_fm.horizontalAdvance(f"T{i + 1}") + 4, SMALL_H), Qt.AlignmentFlag.AlignLeft, f"T{i + 1}")
                     last_label_x = x
             if self.shot_end:
                 x = self.mapFromScene(QPointF(self.x_of(self.shot_end), 0)).x()
                 if x >= HEADER_W:
                     p.setPen(QColor("#d0453b"))
-                    p.drawText(QRectF(x - 80, 15, 76, 14), Qt.AlignmentFlag.AlignRight, "end of shot")
+                    p.drawText(QRectF(x - small_fm.horizontalAdvance("end of shot") - 8, RULER_H - SMALL_H - 1, small_fm.horizontalAdvance("end of shot") + 4, SMALL_H), Qt.AlignmentFlag.AlignRight, "end of shot")
             p.setPen(QColor("#4a5566"))
-            p.drawText(QRectF(6, 4, HEADER_W - 10, 22), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"1 tick = {exp.tick:.3f} ns")
+            p.drawText(QRectF(6, 0, HEADER_W - 10, RULER_H), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"1 tick = {exp.tick:.3f} ns")
         p.restore()
 
     def _subtitle(self, row: TrackRow) -> str:

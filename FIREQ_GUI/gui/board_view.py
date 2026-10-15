@@ -10,6 +10,7 @@ from .qt import (
     QColor,
     QEvent,
     QFont,
+    QFontMetricsF,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -29,9 +30,22 @@ from .qt import (
     pyqtSignal,
 )
 
-# connectors drawn per row and size of one connector cell in pixels
+# connectors drawn per row and minimum size of one connector cell in pixels
 PER_ROW = 8
 CELL_W, CELL_H = 86, 78
+
+
+def _small(font: QFont) -> QFont:
+    """Return the smaller font of the connector labels.
+
+    :param font: widget font.
+    :type font: QFont
+    :return: the small font.
+    :rtype: QFont
+    """
+    f = QFont(font)
+    f.setPointSize(max(f.pointSize() - 1, 7))
+    return f
 
 
 class ConnectorMap(QWidget):
@@ -72,6 +86,21 @@ class ConnectorMap(QWidget):
         """
         return max(1, (n + PER_ROW - 1) // PER_ROW)
 
+    def _metrics(self) -> tuple[float, float, float, float]:
+        """Return the cell size and the line heights for the current font.
+
+        :return: cell width, cell height, normal and small line height.
+        :rtype: tuple[float, float, float, float]
+        """
+        fm, sm = QFontMetricsF(self.font()), QFontMetricsF(_small(self.font()))
+        line_h, small_h = fm.height(), sm.height()
+        # wide enough for the longest connector name, tall enough for ring + two labels
+        names = [c.name + (f" ({c.sma})" if c.sma else "") for c in (self.board.dacs + self.board.adcs)] if self.board else []
+        names += ["not routed", "readout, acq"]
+        cell_w = max([CELL_W] + [sm.horizontalAdvance(n) + 8 for n in names])
+        cell_h = max(CELL_H, 37 + 2 * small_h + 8)
+        return cell_w, cell_h, line_h, small_h
+
     def sizeHint(self) -> QSize:  # noqa: N802
         """Return the preferred size.
 
@@ -81,8 +110,9 @@ class ConnectorMap(QWidget):
         if self.board is None:
             return QSize(400, 200)
         # one block of rows for the DACs and one for the ADCs, plus room for titles and margins
+        cell_w, cell_h, line_h, _ = self._metrics()
         rows = self._rows(len(self.board.dacs)) + self._rows(len(self.board.adcs))
-        return QSize(PER_ROW * CELL_W + 40, rows * CELL_H + 90)
+        return QSize(int(PER_ROW * cell_w + 40), int(rows * cell_h + 3 * line_h + 50))
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
         """Return the minimum size.
@@ -113,10 +143,11 @@ class ConnectorMap(QWidget):
         f.setBold(True)
         f.setPointSize(f.pointSize() + 2)
         p.setFont(f)
-        p.drawText(QRectF(r.left() + 14, r.top() + 6, r.width() - 28, 24), Qt.AlignmentFlag.AlignLeft, self.board.title)
+        title_h = QFontMetricsF(f).height()
+        p.drawText(QRectF(r.left() + 14, r.top() + 6, r.width() - 28, title_h), Qt.AlignmentFlag.AlignLeft, self.board.title)
         # reset hit areas, then draw the DAC group with the ADC group just below it
         self._hits = []
-        y = r.top() + 36
+        y = r.top() + 12 + title_h
         y = self._section(p, "DAC channels (outputs)", self.board.dacs, r.left() + 14, y)
         self._section(p, "ADC channels (inputs)", self.board.adcs, r.left() + 14, y + 8)
         p.end()
@@ -137,19 +168,19 @@ class ConnectorMap(QWidget):
         :return: the y coordinate after the group.
         :rtype: float
         """
+        cell_w, cell_h, line_h, small_h = self._metrics()
         f = QFont(self.font())
         f.setBold(True)
         p.setFont(f)
         p.setPen(QColor("#2b5d34"))
-        p.drawText(QRectF(x0, y0, 300, 16), Qt.AlignmentFlag.AlignLeft, title)
+        p.drawText(QRectF(x0, y0, PER_ROW * cell_w, line_h), Qt.AlignmentFlag.AlignLeft, title)
         # smaller font for the labels under each connector
-        small = QFont(self.font())
-        small.setPointSize(max(small.pointSize() - 1, 7))
-        y0 += 18
+        small = _small(self.font())
+        y0 += line_h + 2
         for i, c in enumerate(conns):
             # centre of the connector cell in the grid
-            cx = x0 + (i % PER_ROW) * CELL_W + CELL_W / 2
-            cy = y0 + (i // PER_ROW) * CELL_H + 20
+            cx = x0 + (i % PER_ROW) * cell_w + cell_w / 2
+            cy = y0 + (i // PER_ROW) * cell_h + 20
             users = self.usage.get(c.label, [])
             # outer ring: gold if routed to an SMA, grey otherwise
             outer = QRectF(cx - 15, cy - 15, 30, 30)
@@ -172,11 +203,11 @@ class ConnectorMap(QWidget):
             # connector name (and SMA label) below the ring
             p.setFont(small)
             p.setPen(QColor("#222") if c.routed else QColor("#999"))
-            p.drawText(QRectF(cx - CELL_W / 2, cy + 17, CELL_W, 14), Qt.AlignmentFlag.AlignHCenter, c.name + (f" ({c.sma})" if c.sma else ""))
+            p.drawText(QRectF(cx - cell_w / 2, cy + 17, cell_w, small_h), Qt.AlignmentFlag.AlignHCenter, c.name + (f" ({c.sma})" if c.sma else ""))
             # second label: tracks using the channel, or its free / not routed state
             sub = ", ".join(u for u, _ in users) if users else ("free" if c.routed else "not routed")
             p.setPen(QColor(users[0][1]) if users else QColor("#888"))
-            p.drawText(QRectF(cx - CELL_W / 2, cy + 30, CELL_W, 14), Qt.AlignmentFlag.AlignHCenter, _elide(sub, 14))
+            p.drawText(QRectF(cx - cell_w / 2, cy + 19 + small_h, cell_w, small_h), Qt.AlignmentFlag.AlignHCenter, _elide(sub, 14))
             # tooltip with tile/block, routing and usage details
             tip = f"{c.label} — tile {c.tile}, block {c.block}" + (f", SMA {c.sma}" if c.sma else "")
             if c.kind == "dac":
@@ -188,8 +219,8 @@ class ConnectorMap(QWidget):
             if users:
                 tip += "\nused by: " + ", ".join(u for u, _ in users)
             # hit area covers the whole cell, used by event() to show the tooltip
-            self._hits.append((QRectF(cx - CELL_W / 2, cy - 18, CELL_W, CELL_H - 10), tip))
-        return y0 + self._rows(len(conns)) * CELL_H
+            self._hits.append((QRectF(cx - cell_w / 2, cy - 18, cell_w, cell_h - 10), tip))
+        return y0 + self._rows(len(conns)) * cell_h
 
     def event(self, ev: QEvent) -> bool:
         """Show connector tooltips.

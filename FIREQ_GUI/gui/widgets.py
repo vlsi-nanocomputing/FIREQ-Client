@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from ..core.expressions import Param, format_param, param_kind, parse_param
 from .qt import (
+    QApplication,
     QBrush,
     QColor,
     QColorDialog,
@@ -14,14 +15,95 @@ from .qt import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QEvent,
     QLineEdit,
+    QMessageBox,
     QObject,
     QPushButton,
+    QShowEvent,
     QStringListModel,
     Qt,
     QWidget,
     pyqtSignal,
 )
+
+
+class MessageBox(QMessageBox):
+    """QMessageBox that does not fix its own size.
+
+    QMessageBox makes itself fixed-size. On Wayland with client-side decorations
+    (GNOME) the compositor then takes the decoration margins out of that size, so the
+    contents get about 20 px less than they need and text and buttons are clipped.
+    Keeping the size QMessageBox computed as minimum, but not as maximum, avoids it.
+    Other platforms keep the stock fixed-size box. The static helpers mirror the
+    QMessageBox ones.
+    """
+
+    def _unfix(self) -> None:
+        """Turn the fixed size set by QMessageBox into a minimum size (Wayland only)."""
+        if QApplication.platformName().startswith("wayland") and self.minimumSize() == self.maximumSize():
+            self.setMaximumSize(16777215, 16777215)  # QWIDGETSIZE_MAX
+
+    def showEvent(self, ev: QShowEvent) -> None:  # noqa: N802
+        """Unfix the size before the window is mapped.
+
+        :param ev: show event.
+        :type ev: QShowEvent
+        """
+        super().showEvent(ev)
+        self._unfix()
+
+    def event(self, ev: QEvent) -> bool:
+        """Unfix the size again after QMessageBox recomputes it (font, style or text changes).
+
+        :param ev: widget event.
+        :type ev: QEvent
+        :return: True if the event was handled.
+        :rtype: bool
+        """
+        handled = super().event(ev)
+        self._unfix()
+        return handled
+
+    @classmethod
+    def _ask(cls, icon: QMessageBox.Icon, parent: QWidget | None, title: str, text: str, buttons: QMessageBox.StandardButton) -> QMessageBox.StandardButton:
+        """Show a modal message box and return the button pressed.
+
+        :param icon: icon of the box.
+        :type icon: QMessageBox.Icon
+        :param parent: parent widget.
+        :type parent: QWidget | None
+        :param title: window title.
+        :type title: str
+        :param text: message.
+        :type text: str
+        :param buttons: standard buttons to show.
+        :type buttons: QMessageBox.StandardButton
+        :return: the button pressed.
+        :rtype: QMessageBox.StandardButton
+        """
+        box = cls(icon, title, text, buttons, parent)
+        return QMessageBox.StandardButton(box.exec())
+
+    @classmethod
+    def question(cls, parent: QWidget | None, title: str, text: str, buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) -> QMessageBox.StandardButton:
+        """Ask a question, like :meth:`QMessageBox.question`."""
+        return cls._ask(QMessageBox.Icon.Question, parent, title, text, buttons)
+
+    @classmethod
+    def warning(cls, parent: QWidget | None, title: str, text: str, buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Ok) -> QMessageBox.StandardButton:
+        """Show a warning, like :meth:`QMessageBox.warning`."""
+        return cls._ask(QMessageBox.Icon.Warning, parent, title, text, buttons)
+
+    @classmethod
+    def critical(cls, parent: QWidget | None, title: str, text: str, buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Ok) -> QMessageBox.StandardButton:
+        """Show an error, like :meth:`QMessageBox.critical`."""
+        return cls._ask(QMessageBox.Icon.Critical, parent, title, text, buttons)
+
+    @classmethod
+    def information(cls, parent: QWidget | None, title: str, text: str, buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Ok) -> QMessageBox.StandardButton:
+        """Show a message, like :meth:`QMessageBox.information`."""
+        return cls._ask(QMessageBox.Icon.Information, parent, title, text, buttons)
 
 
 class NameRegistry(QObject):
