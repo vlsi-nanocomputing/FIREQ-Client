@@ -90,8 +90,8 @@ class SendWorker:
                 self.log.exception("Send failed, shutting down the send worker")
                 self.failed.set()
                 break
-            finally:
-                self._queue.task_done()
+            # only a message actually sent counts as done
+            self._queue.task_done()
         # stop if the stop event is not set
         if not self._stop_event.is_set():
             self.stop()
