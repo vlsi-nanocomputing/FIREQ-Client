@@ -24,11 +24,11 @@ def main() -> None:
     logger.info("### FIREQ Client startup ###\n")
 
     # set logging level
-    log_level = input("Input logging level: 'debug', 'info' (press enter for 'info')\n")
+    log_level = input("Input logging level: 'debug', 'info' (press enter for 'info')\n").strip().lower()
     if log_level == "debug":
         logging.getLogger().setLevel(logging.DEBUG)
-    else:
-        pass
+    elif log_level not in ("", "info"):
+        logger.warning(f"Unknown logging level '{log_level}', using 'info'")
 
     # Get server configuration
     server_ip = input('# Insert server IP (press Enter for "0.0.0.0")\n').strip()
@@ -50,7 +50,7 @@ def main() -> None:
         auth_token = "fireq"
 
     # run the server
-    client = Client(server_ip, server_port)
+    client = Client(server_ip, server_port, auth_token=auth_token)
     client.start()
 
 

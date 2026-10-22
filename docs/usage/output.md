@@ -15,9 +15,10 @@ Every run writes:
 - `experiment_summary.yaml`: the experiment name, the configuration used for the run, and
   the variable information — the sweep variables in `var_order` and their values in
   `var_values`,
-- `runtimes.yaml`: the timing of the sweep, written when the experiment ends. It currently
-  holds `sweep_total`, the total sweep time reported by the server; the per-iteration
-  `runtimes` list is not populated yet,
+- `runtimes.yaml`: the timing of the run, written when the experiment ends, as reported by
+  the server, in nanoseconds: `runtimes` holds the time of each iteration (one entry per
+  sweep point), `run_time` the total time of the run. `aborted` is `true` when the server
+  stopped the run early, in which case the data is partial,
 - one subdirectory per acquisition IP (`axisAcquisitionIP_0/`, `axisAcquisitionIP_1/`, …),
   holding the data acquired by that IP.
 
