@@ -7,6 +7,58 @@ tag names follow the `version-<major>.<minor>.<patch>` scheme.
 
 ## [Unreleased]
 
+Requires FIREQ-Server `v0.1.1` (protocol described in `client_handoff_v0.1.1.md`; what the
+client sends is in `server_handoff_client_commands_v0.1.1.md`).
+
+### Added
+
+- `Client(host, port, auth_token=..., output_dir=...)`: the token typed at the `run_client.py`
+  prompt is now sent in the handshake (it was ignored), and the output directory is configurable
+  (default still `experiment_output`, relative to the working directory).
+- Tests in `tests/` (`pytest`, added to the `dev` extras): network workers, connection loss,
+  configuration validation, preprocessing, and the server's reply sequences.
+
+### Changed
+
+- `runtimes.yaml` holds the times reported by the server, in ns: `runtimes` (one per
+  iteration, from `iteration_ended.time`), `run_time` and `aborted` (from
+  `experiment_footer`). The former `sweep_total` key was always empty: the server never sent
+  `sweep_time`.
+- `%name` preprocess tokens are resolved anywhere in a value, including inside `#` sweep
+  expressions (`"#%var1 - %var2 + 100"` → `"#1000 - 500 + 100"`), and in `variables` too. A
+  value that is exactly one token keeps the preprocess value's type, as before.
+- `ping` and `reset_all` no longer send the unused `session_id` field.
+
+### Fixed
+
+- `run_yaml` failed on every run against server v0.1.1: it now accepts the `status ok` sent
+  before `experiment_header`, reports a run rejected with an `error` before the header (also
+  when it follows `status ok`), logs `warning` packets, and after an `error` during the run
+  keeps reading up to the footer (`aborted: true`, partial data kept).
+- Every command now reads its reply, so a reply can no longer be taken as the next command's:
+  `mts_sync`, `set_nyquist`, and the `warning` that follows `apply_configuration` when the
+  configuration has sweep expressions (detected with the server's rule: the string value of a
+  `$` key starting with `#`).
+- When a run fails on the client side after the header, the rest of the experiment is read
+  out up to its footer instead of being taken as the next command's reply.
+- A dropped connection no longer hangs the client: waiting commands raise `ConnectionError`,
+  the session is closed with a message (no automatic reconnect), and a send error no longer
+  kills the sender thread silently.
+- Windows (no `sendmsg`) send path raised `NameError` on the first message.
+- Two runs started in the same second no longer collide: the second one gets
+  `experiment_<timestamp>_1`, and so on.
+- Quitting no longer waits up to 5 s for the socket timeout.
+- The 1 s connection timeout no longer stays on the socket after connecting.
+- Answering `n` to `retry?` retried the connection.
+- A failing command (bad argument, missing/invalid/empty YAML, server `error`) no longer ends the
+  session.
+- `config_yaml` and `run_yaml` reject a YAML without (or with an empty) `sys_config`.
+- An undefined `%name` is an error even when the file has no `preprocess` block.
+- The expected number of iterations only counts the variables in `variable_order`.
+- The progress bar is closed when fetching fails.
+- Stopping a worker that was never started, or disconnecting without a socket, no longer raises.
+- `client.py` debug logs are no longer forced to INFO, so the `debug` choice at startup works.
+
 ## [0.1.1] - 2026-09-15
 
 ### Breaking changes
