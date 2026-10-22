@@ -150,3 +150,27 @@ def test_disconnect_is_fast_and_not_reported_as_lost(pair):
     client._disconnect()
     assert time.time() - start < 1.0
     assert not client.reader.failed.is_set()
+
+
+def test_handshake_sends_token_and_client_name(pair):
+    _, b = pair
+    client = Client("localhost", 0, auth_token="secret", client_name="lab-pc")
+    client.reader, client.sender = ReceiveWorker(b), SendWorker(b)
+    client.reader._queue.put(Message(header={"type": "handshake"}))
+    client._do_handshake()
+    ack = client.sender._queue.get_nowait().header
+    assert ack == {"type": "handshake_ack", "token": "secret", "client_name": "lab-pc"}
+
+
+def test_workers_use_the_client_logger(monkeypatch):
+    a, b = socket.socketpair()
+    monkeypatch.setattr(socket, "create_connection", lambda *args, **kwargs: a)
+    client = Client("localhost", 0)
+    client._connect()
+    try:
+        assert client.reader.log.name == "FIREQ_CLIENT.client.reader"
+        assert client.sender.log.name == "FIREQ_CLIENT.client.sender"
+        assert a.gettimeout() == 5.0
+    finally:
+        client._disconnect()
+        b.close()

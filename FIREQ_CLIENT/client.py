@@ -23,7 +23,8 @@ from .prompt_completer import make_prompt_session
 from .yaml_preprocessor import load_and_resolve
 
 DEFAULT_AUTH_TOKEN = "fireq"
-CLIENT_NAME = "minimal_client"
+#: name the client gives itself in the handshake; the server accepts any string
+DEFAULT_CLIENT_NAME = f"fireq_client@{socket.gethostname()}"
 DEFAULT_OUTPUT_DIR = "experiment_output"
 #: socket timeout once connected; the workers retry on timeouts, so it only bounds how
 #: long a blocked send/recv takes to notice a stop request
@@ -46,6 +47,7 @@ class Client:
         port: int,
         auth_token: str = DEFAULT_AUTH_TOKEN,
         output_dir: str = DEFAULT_OUTPUT_DIR,
+        client_name: str = DEFAULT_CLIENT_NAME,
     ) -> None:
         """Initialize the client with the server address.
 
@@ -57,11 +59,14 @@ class Client:
         :type auth_token: str
         :param output_dir: directory where the experiment data is stored.
         :type output_dir: str
+        :param client_name: name sent to the server in the handshake.
+        :type client_name: str
         """
         self.host = host
         self.port = port
         self.auth_token = auth_token
         self.output_dir = output_dir
+        self.client_name = client_name
         self.log = logging.getLogger(__name__)
         self.sock: socket.socket | None = None
         self.reader: ReceiveWorker | None = None
@@ -83,6 +88,7 @@ class Client:
             # Create a session with history file
             completer = make_prompt_session()
 
+            self.log.info(f"Experiment data is saved in {os.path.abspath(self.output_dir)}")
             self.log.info("Connected. Type commands, 'quit' to exit.")
             while True:
                 cmd = completer.prompt("> ").strip()
@@ -114,8 +120,8 @@ class Client:
         self.sock = socket.create_connection((self.host, self.port), timeout=timeout)
         # the connection timeout would otherwise stay on the socket and interrupt large sends
         self.sock.settimeout(SOCKET_TIMEOUT)
-        self.reader = ReceiveWorker(self.sock)
-        self.sender = SendWorker(self.sock)
+        self.reader = ReceiveWorker(self.sock, logger=self.log.getChild("reader"))
+        self.sender = SendWorker(self.sock, logger=self.log.getChild("sender"))
         self.reader.start()
         self.sender.start()
         return True
@@ -168,7 +174,7 @@ class Client:
         if handshake.header.get("type") != "handshake":
             raise ValueError(f"Expected handshake, got {handshake.header}")
 
-        ack = {"type": "handshake_ack", "token": self.auth_token, "client_name": CLIENT_NAME}
+        ack = {"type": "handshake_ack", "token": self.auth_token, "client_name": self.client_name}
         self.sender.send(Message(header=ack))
         self.log.info("Handshake completed.")
 

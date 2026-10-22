@@ -3,8 +3,11 @@
 Each experiment run creates a timestamped output directory under:
 
 ```text
-experiment_output/<experiment_name>/experiment_<timestamp>/
+<output directory>/<experiment_name>/experiment_<timestamp>/
 ```
+
+The output directory is asked at startup and defaults to `experiment_output`, relative to the
+directory the client is started from; the client logs its absolute path once connected.
 
 The folder is created automatically, named after the moment the run starts. Inside it, the
 client stores the experiment under the experiment name and writes the files produced during
