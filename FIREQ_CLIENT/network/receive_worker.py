@@ -14,16 +14,21 @@ from .protocol import Message
 class ReceiveWorker:
     """Reads framed messages from a socket in a background thread."""
 
-    def __init__(self, sock: socket.socket, logger: logging.Logger = None) -> None:
+    def __init__(self, sock: socket.socket, logger: logging.Logger | None = None) -> None:
         """Initialize the receiver with the socket and a background thread.
 
         :param sock: the socket used to receive messages.
         :type sock: socket.socket
+        :param logger: logger used by the worker, defaults to the module logger.
+        :type logger: logging.Logger | None
         """
         self._sock = sock
         self._queue = Queue()
         self.log = logger or logging.getLogger(__name__)
         self._stop_event = Event()
+        #: set when the worker ended because of a connection error rather than a stop request
+        self.failed = Event()
+        self._thread: Thread | None = None
 
     def start(self) -> None:
         """Start the receive worker thread."""
@@ -32,14 +37,14 @@ class ReceiveWorker:
         self.log.debug("Thread started")
 
     def stop(self, timeout: float | None = None) -> None:
-        """Stop the reading thread and close the socket.
+        """Stop the reading thread (the socket is closed by the owner of the socket).
 
         :param timeout: how long to wait for the thread to stop.
         :type timeout: float | None
         """
         self._stop_event.set()
         # the worker calls this on its way out, and a thread cannot join itself
-        if current_thread() is not self._thread:
+        if self._thread is not None and current_thread() is not self._thread:
             self._thread.join(timeout)
 
     def get_message(self, block: bool = True, timeout: float | None = None) -> Message:
@@ -88,7 +93,7 @@ class ReceiveWorker:
             try:
                 # read the first 4 bytes which define the length of the header
                 size_bytes = self._recv_exactly(4)
-                header_size = struct.unpack("!I", size_bytes)[0]
+                header_size = struct.unpack(">I", size_bytes)[0]
                 # receive the header
                 header_bytes = self._recv_exactly(header_size)
                 header = msgpack.unpackb(header_bytes, raw=False)
@@ -98,10 +103,14 @@ class ReceiveWorker:
                 self._queue.put(Message(header=header, data=data))
             except TimeoutError:
                 continue
-            except ConnectionError:
+            except ConnectionError as e:
+                if not self._stop_event.is_set():
+                    self.log.warning(f"Connection lost: {e}")
+                    self.failed.set()
                 break
             except Exception as e:
                 self.log.exception(f"Caught exception {e} in receive worker, shutting down")
+                self.failed.set()
                 break
         if not self._stop_event.is_set():
             self.stop()
