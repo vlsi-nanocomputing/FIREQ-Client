@@ -7,7 +7,7 @@ tag names follow the `version-<major>.<minor>.<patch>` scheme.
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-10-22
+## [0.1.1] - 2026-10-23
 
 Requires FIREQ-Server `v0.1.1`.
 
@@ -61,8 +61,12 @@ Requires FIREQ-Server `v0.1.1`.
   / `.sender`), and connect/disconnect and worker lifecycle messages are log records.
 - `mts_sync` and `set_nyquist` read and print the server's reply.
 - Tests in `tests/` (`pytest`, in the `dev` extras): network workers, connection loss,
-  configuration validation, preprocessing, and the server's reply sequences.
+  configuration validation, preprocessing, the server's reply sequences, and the plotter's
+  readout fidelity analysis.
 - `yaml_experiment_configurations_examples/drive_loopback.yaml` example experiment.
+- `FIREQ_PLOTTER.plotting.fidelity`: `compute_readout_fidelity()` returns a
+  `ReadoutFidelity` (both fidelities, ε0, ε1, threshold, rotation angle, shot counts),
+  without plotting. `_plot_rotated_cdf` now returns the figure and that result.
 
 ### Fixed
 
@@ -112,6 +116,19 @@ Requires FIREQ-Server `v0.1.1`.
   leaked into the image), data without a `shot` index level raised instead of plotting,
   `plot_iq_curve` limits were unstable under equal aspect, and the CDF analysis is skipped
   gracefully for datasets with fewer than two samples.
+- Plotter: the readout fidelity analysis of `plot_iq_curve` ran on shot-averaged data. It
+  now uses the un-averaged shots, and only on data with no swept variable other than `shot`
+  and one sample per shot (`accumulated` mode); other data is skipped with a message, or
+  rejected with `ValueError` when `cdf_analysis=True`.
+- Plotter: `plot_iq_curve` on single-run state datasets (`IQ_at_0.yaml` / `IQ_at_1.yaml`, no
+  sweep variable) failed with `Not enough axes in data to plot an IQ curve`. The raw shot
+  clouds are now plotted, with no selector and no slider, and the fidelity is computed.
+- Plotter: the printed "maximum fidelity" was the separation `1 - ε0 - ε1`. The analysis now
+  prints the assignment fidelity `1 - (ε0 + ε1)/2`, the separation `1 - ε0 - ε1`, the error
+  rates, the threshold and the shot counts.
+- Plotter: the threshold was searched on a grid and on the absolute CDF difference. It is
+  now the midpoint between shot values that maximises the signed difference `CDF0 - CDF1`,
+  and the cumulative distributions are drawn as step functions.
 
 ### Changed
 

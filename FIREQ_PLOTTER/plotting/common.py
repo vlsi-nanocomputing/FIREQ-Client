@@ -61,13 +61,17 @@ class SelectorSpec(NamedTuple):
 
 
 class PlotHandles(NamedTuple):
-    """The interactive elements of a plot, returned for inspection and tests."""
+    """The interactive elements of a plot, returned for inspection and tests.
+
+    A plot without selectors has no controls window: ``radios`` is then empty
+    and ``controls`` is None.
+    """
 
     figure: Figure
     axes: Axes
     radios: dict[str, RadioButtons]
     panel: SliderPanel
-    controls: Figure
+    controls: Figure | None
 
 
 def _unwrap_phase(values: np.ndarray) -> np.ndarray:
