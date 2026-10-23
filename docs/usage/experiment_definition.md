@@ -16,7 +16,7 @@ Experiment definitions are stored in YAML format (typically within the `experime
 
 The YAML parser relies on specialized prefixes to interpret values and construct the hardware execution graph:
 
-* **`%` (Preprocess Macro):** Resolved client-side from the `preprocess` block before sending configurations to the server (e.g., `%DEFAULT_PULSE_LEN`).
+* **`%` (Preprocess Macro):** Resolved client-side from the `preprocess` block before sending configurations to the server (e.g., `%DEFAULT_PULSE_LEN`). Tokens are resolved in every value of `sys_config` and `variables`. A value that is a single token (`"%gain_r"`) takes the preprocess value with its type; a token inside a longer string, including a `#` expression, is replaced by its text: with `var1: 1000` and `var2: 500`, `"#%var1 - %var2 + 100"` becomes `"#1000 - 500 + 100"`. An undefined name is an error.
 * **`#` (Sweep Reference):** Binds a parameter to a sweepable dynamic variable defined in the `variables` section (e.g., `#freq`, `#gain`).
 * **`$` (Dynamic Hardware Parameter):** Maps directly to runtime parameter callbacks on server-side hardware nodes (e.g., `$duration`, `$gain`, `$rfrequency`).
 * **`_` (Static Node Property):** Specifies immutable structural metadata set during node instantiation (e.g., `_name`, `_envelope`, `_readout`).
@@ -207,6 +207,10 @@ python run_client.py
 ```text
 run_yaml yaml_experiment_configurations_examples/<experiment_name>.yaml
 ```
+
+The same file can be applied to the server without running the experiment, by using
+`config_yaml` instead of `run_yaml` (see the
+[interactive command reference](command.md)).
 
 4. wait for the acquisition to complete,
 5. inspect the generated output files.

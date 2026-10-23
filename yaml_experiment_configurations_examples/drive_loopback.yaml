@@ -1,0 +1,70 @@
+# ── Preprocess variables ──────────────────────────────────────────
+preprocess:
+  drive_frequency: 3000.0
+  drive_gain: 0.5
+  drive_pulse_duration: 100
+  acquisition_event_duration: 1000
+  tof: 2
+  shots: 20
+
+# ── System configuration tree ─────────────────────────────────────
+sys_config:
+  $shots: "%shots"   # run 1 experiment shots
+
+  # ── Generator sub-tree ──────────────────────────────────────────
+  /axisGeneratorIP_0:
+    $dfrequency: "%drive_frequency"   # drive modulation frequency (MHz)
+    $rfrequency: 0                    # readout modulation frequency (MHz)
+    $rphase: 0.0                      # readout initial phase (rad)
+    $rchannel: 0                      # readout trigger channel 
+    $dchannel: 1                      # drive trigger channel  
+    # create a drive pulse 
+    pulse:
+      - _name: rect_d
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: 1
+        $duration: "%drive_pulse_duration"
+        $gain: "%drive_gain"  
+    $drive_order:
+      - rect_d  
+      - rect_d
+      - rect_d           
+
+  # ── Acquisition sub-tree ────────────────────────────────────────
+  /axisAcquisitionIP_0:
+    $duration: "%acquisition_event_duration"  # acquisition window (ns)
+    $output_type: decimated           # "raw" | "decimated" | "accumulated"
+    $rfrequency: "%drive_frequency"   # demodulation frequency (MHz)
+    $rphase: 0.0                      # demodulation phase (rad)
+    $rchannel: 1                      # trigger channel, note that it is different than in the generator
+    $tof: "%tof"                        # time-of-flight (ns)
+  
+  /axisAcquisitionIP_1:
+    $duration: "%acquisition_event_duration"  # acquisition window (ns)
+    $output_type: decimated           # "raw" | "decimated" | "accumulated"
+    $rfrequency: "%drive_frequency"   # demodulation frequency (MHz)
+    $rphase: 0.0                      # demodulation phase (rad)
+    $rchannel: 1                      # trigger channel, note that it is different than in the generator
+    $tof: "%tof"                        # time-of-flight (ns)
+
+  # ── Trigger generator sub-tree ──────────────────────────────────
+  /axisTriggerGenerator_0:
+    $experiment_duration: 3000.0    # per-shot duration (ns)
+    delay:
+      - _name: acquisition
+        _ttype: readout
+        _channel_mask: 1 # immediately activate the acquisition
+        _index: 1
+        $delay: 50       # a small delay to avoid 0 error
+      - _name: drive_delay
+        _ttype: drive
+        _channel_mask: 1
+        _index: 2
+        $delay: 5
+      - _name: drive_delay_1
+        _ttype: drive
+        _channel_mask: 1
+        _index: 3
+        $delay: 200
+      
