@@ -1,22 +1,33 @@
 # Client Experiment Configuration & Execution
 
-Experiments in the FIREQ platform are defined using a structured YAML specification and executed through the interactive client CLI. This document details the YAML file structure, parameter syntax rules, node configuration schemas, and the operational workflow.
+Experiments in the FIREQ platform are defined using a structured YAML specification and
+executed through the interactive client CLI. This document describes the YAML structure,
+parameter syntax, node configuration schemas, generated files, and the complete execution
+workflow.
 
 ---
 
 ## 1. YAML Configuration Architecture
 
-Experiment definitions are stored in YAML format (typically within the `experiments/` directory). If that directory does not exist yet, the client creates it automatically when the experiment is launched. The file is then structured into three primary top-level sections:
+Experiment definitions are stored in YAML format (for example, in
+`yaml_experiment_configurations_examples/`). The input directory is not created by the
+client. A definition has three top-level sections:
 
 1. **`preprocess`**: Defines static constants and reusable macros.
-2. **`variables`**: Specifies parameter sweeps using linear ranges.
+2. **`variables`**: Specifies parameter sweeps using linear ranges or explicit lists.
 3. **`sys_config`**: Describes the target hardware configuration tree and node parameter callbacks.
 
 ### Syntax & Prefix Rules
 
 The YAML parser relies on specialized prefixes to interpret values and construct the hardware execution graph:
 
-* **`%` (Preprocess Macro):** Resolved client-side from the `preprocess` block before sending configurations to the server (e.g., `%DEFAULT_PULSE_LEN`). Tokens are resolved in every value of `sys_config` and `variables`. A value that is a single token (`"%gain_r"`) takes the preprocess value with its type; a token inside a longer string, including a `#` expression, is replaced by its text: with `var1: 1000` and `var2: 500`, `"#%var1 - %var2 + 100"` becomes `"#1000 - 500 + 100"`. An undefined name is an error.
+* **`%` (Preprocess Macro):** Resolved client-side from the `preprocess` block before
+  sending the configuration to the server (for example, `%DEFAULT_PULSE_LEN`). Tokens
+  are resolved recursively in values under `sys_config` and `variables`. A value that
+  consists of one token (`"%gain_r"`) keeps the type of the referenced value. A token
+  embedded in a longer string, including a `#` expression, is replaced by its text:
+  `"#%var1 - %var2 + 100"` becomes `"#1000 - 500 + 100"`. An undefined name is an
+  error.
 * **`#` (Sweep Reference):** Binds a parameter to a sweepable dynamic variable defined in the `variables` section (e.g., `#freq`, `#gain`).
 * **`$` (Dynamic Hardware Parameter):** Maps directly to runtime parameter callbacks on server-side hardware nodes (e.g., `$duration`, `$gain`, `$rfrequency`).
 * **`_` (Static Node Property):** Specifies immutable structural metadata set during node instantiation (e.g., `_name`, `_envelope`, `_readout`).
@@ -114,7 +125,7 @@ Specifies channel-specific trigger delay offsets.
 | :--- | :--- | :--- | :--- |
 | `_name` | `str` | Required | Identifier for the delay instance |
 | `_ttype` | `str` | Required | Trigger target type: `"drive"` or `"readout"` |
-| `_channel` | `int` | Required | Channel index or bitmask target |
+| `_channel_mask` | `int` | Required | Channel bitmask target |
 | `_index` | `int` | Optional | Sequence index for multi-drive delay tracking |
 | `_generate_trigger` | `bool` | `False` | Fires a physical trigger upon delay counter expiration |
 | `$delay` | `float` | Required | Timing delay value in nanoseconds (`ns`) |
@@ -201,87 +212,132 @@ sys_config:
         $delay: 100
 ```
 
-  ### Expected output
+### Sweep definitions
 
-  The two sweeps produce 50 × 20 = 1000 acquisition points. For the acquisition node in
-  this example, the client creates one directory containing a `.pkl` and a `.csv` for each
-  point, plus a run summary and timing file:
+Each entry in `variables` must specify a mode:
 
-  ```text
-  experiment_output/<experiment_name>/experiment_<timestamp>/
-  ├── axisAcquisitionIP_0/
-  │   ├── data_0_0.pkl
-  │   ├── data_0_0.csv
-  │   ├── ...
-  │   ├── data_49_19.pkl
-  │   └── data_49_19.csv
-  ├── experiment_summary.yaml
-  └── runtimes.yaml
-  ```
+```yaml
+variables:
+  frequency:
+    mode: lin
+    start: 2000
+    stop: 3000
+    num: 50
+  gain:
+    mode: list
+    values: [0.05, 0.1, 0.2, 0.5]
+```
 
-  There are 1000 `.pkl`/`.csv` pairs in `axisAcquisitionIP_0/`. The numbers in each
-  filename are sweep indices in the order recorded as `var_order` in
-  `experiment_summary.yaml` (for this example, frequency and gain). The summary also
-  contains the corresponding sweep values. Each `.pkl` stores the per-point dataframe;
-  the `.csv` stores the same dataframe in text form. Its columns are:
+`lin` uses `start`, `stop`, and `num` and produces `num` linearly spaced values,
+including the endpoints. `list` uses `values` exactly as written. A variable is swept
+only when it is referenced by a `#name` expression in `sys_config`; unused variables
+are still recorded in the experiment header but do not add iterations. The server
+determines `var_order` from the callbacks used by the configuration. That order is
+the outer-to-inner loop order and is recorded in `experiment_summary.yaml`.
 
-  | Column | Meaning in this experiment |
-  | :--- | :--- |
-  | `shot` | Shot index, from 0 to 999. |
-  | `time` | Sample index within a shot. It is 0 for every row because `accumulated` mode returns one integrated sample per shot, rather than a time trace. |
-  | `value` | Complex acquired sample (`I + jQ`) for that shot, accumulated over the 1.5 µs acquisition window. |
+## Generated output
 
-  The `shot` and `time` columns come from the dataframe index and are included in the CSV
-  when it is written. `runtimes.yaml` records the total sweep time reported by the server.
+By default, the client writes runs below `experiment_output`, relative to the directory
+from which `run_client.py` was started. The client asks for the output directory at
+startup and logs its absolute path after connecting. For an experiment whose YAML file
+is named `loopback.yaml`, a run has this layout:
 
-  ### Plotting this experiment
+```text
+experiment_output/loopback/experiment_<timestamp>/
+├── axisAcquisitionIP_0/
+│   ├── data_0.pkl
+│   ├── data_0.csv
+│   ├── data_1.pkl
+│   ├── data_1.csv
+│   └── ...
+├── experiment_summary.yaml
+└── runtimes.yaml
+```
 
-  To plot the two-dimensional sweep, first export the run from the client prompt, then start
-  the plotter and select the acquired magnitude with frequency and gain as the heatmap axes:
+There is one acquisition subdirectory for every acquisition IP that sends data. A
+non-swept experiment has `data_0.pkl` and `data_0.csv`; a run with two swept variables
+has names such as `data_0_0.pkl` and `data_0_1.csv`. The indices are zero-based
+positions in `var_order`, not the variable values. For the example above, 50 frequency
+values and 20 gain values produce 1000 iterations and, when the acquisition is active,
+1000 file pairs in `axisAcquisitionIP_0/`.
 
-  ```text
-  export experiment_output/<experiment_name>/experiment_<timestamp>/ exported/<experiment_name>/
-  ```
+Each per-point pickle contains a pandas dataframe. The CSV is the same dataframe in
+text form, including its index:
 
-  ```bash
-  python run_plotter.py
-  ```
+| Field | Meaning |
+| :--- | :--- |
+| `shot` | Zero-based shot index. |
+| `time` | Zero-based sample index within a shot. `accumulated` has one sample (`0`) per shot; `raw` and `decimated` contain a time trace. |
+| `value` | Complex IQ sample (`real + 1j * imag`). |
 
-  ```text
-  plot_3d_heat exported/<experiment_name>/
-  ```
+The `raw` and `decimated` modes differ in the hardware stream and therefore in the
+number of `time` samples per shot; the exact count depends on the acquisition duration
+and hardware sampling/decimation. `accumulated` returns one integrated value per shot.
 
-  In the plotter controls, choose `magnitude` as the quantity, `freq` for one axis, and
-  `gain` for the other. The figure below is a placeholder; replace it with the plot produced
-  from an actual experiment run.
-
-  ![Placeholder for the frequency-versus-gain readout heatmap](images/readout_sweep_plot_placeholder.svg)
+`experiment_summary.yaml` contains the experiment name, the full server experiment
+header, the resolved configuration, `var_order`, the values for each variable, and
+`expected_iterations`. `runtimes.yaml` contains `runtimes` (one duration in nanoseconds
+per iteration), `run_time` (the total duration in nanoseconds), and `aborted`. If
+`aborted` is `true`, the data and per-point files are partial.
 
 ## Running an experiment
 
-To execute an experiment using the FIREQ environment
+The server must be running and reachable before the client connects. Use two terminals:
 
-1. start the FIREQ server first:
+1. Prepare the server and board according to the server documentation, then start it
+   from the `FIREQ-Server` directory:
 
-```bash
-python start_server.py
-```
+   ```bash
+   python start_server.py
+   ```
 
-2. start the client:
+2. In `FIREQ-Client`, configure the server address and port in `run_client.py` if
+   necessary, activate the client virtual environment, and start the client:
 
-```bash
-python run_client.py
-```
+   ```bash
+   python run_client.py
+   ```
 
-3. run an experiment:
+3. At the client prompt, optionally apply the configuration without acquiring data:
 
-```text
-run_yaml yaml_experiment_configurations_examples/<experiment_name>.yaml
-```
+   ```text
+   config_yaml yaml_experiment_configurations_examples/<experiment_name>.yaml
+   ```
 
-The same file can be applied to the server without running the experiment, by using
-`config_yaml` instead of `run_yaml` (see the
-[interactive command reference](command.md)).
+   This validates and applies the configuration, but does not run the sweep. Use
+   `reset_all` between unrelated experiments when server-side state should not be
+   retained.
 
-4. wait for the acquisition to complete,
-5. inspect the generated output files.
+4. Start the experiment:
+
+   ```text
+   run_yaml yaml_experiment_configurations_examples/<experiment_name>.yaml
+   ```
+
+   The client resolves `%` placeholders, sends the resolved `variables` and
+   `sys_config`, receives the experiment header, and streams each DMA package into
+   the appropriate acquisition directory. The progress count is the number of sweep
+   points, not the number of shots.
+
+5. After the prompt returns, inspect the run directory shown by the client:
+
+   * open `experiment_summary.yaml` and verify `var_order`, `var_values`,
+     `expected_iterations`, and the resolved `config`;
+   * check that each acquisition IP has the expected `.pkl`/`.csv` pairs and that
+     their index suffixes cover the sweep points;
+   * load one pickle with `pandas.read_pickle` (or open its CSV) and verify the
+     `shot`, `time`, and `value` fields and the expected number of shots;
+   * open `runtimes.yaml` and check `aborted`, the number of `runtimes`, and
+     `run_time`. Treat an aborted run as incomplete even if some files exist.
+
+6. To combine per-point files into one dataframe per acquisition IP, run the
+   following at the client prompt:
+
+   ```text
+   export experiment_output/<experiment_name>/experiment_<timestamp>/ exported/<experiment_name>/
+   ```
+
+   The exported directory contains `data_<acquisition_ip_name>.pkl`,
+   `data_<acquisition_ip_name>.csv`, and a copy of `experiment_summary.yaml`. The
+   exported dataframe is indexed by `var_order`, `shot`, and `time`, and is the input
+   expected by the plotter. Plotting is optional; see [Plotting and Post-Processing](plot.md).
