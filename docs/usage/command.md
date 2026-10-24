@@ -44,6 +44,15 @@ the input expected by the plotter.
 | `mts_sync` | — | Triggers Multi-Tile Synchronization (MTS) across RF-DC converter tiles to align sample clocks. |
 | `set_nyquist` | `<tile> <block_id> <zone>` | Configures the Nyquist operating zone for a target converter block.<br>_Example:_ `set_nyquist 228 0 2` sets the 2nd Nyquist zone on tile 228, block 0. |
 
+> **Notes** (server `v0.1.1`):
+> - `mts_sync` aligns all active **DAC** tiles, using the tile with the enabled PLL as reference;
+>   ADCs are not synced. The server never syncs on its own, not even at startup: send `mts_sync`
+>   whenever the DAC tiles must be aligned, e.g. after loading the server.
+> - `set_nyquist`: tiles 224–227 are ADC and 228–231 are DAC, `block_id` starts at 0, `zone` is
+>   `1` (odd) or `2` (even). An inactive block or another zone gives an error listing the active
+>   blocks.
+> - Both settings last until the overlay is reloaded; `reset_all` does not change them.
+
 ---
 
 ## Hardware Trigger

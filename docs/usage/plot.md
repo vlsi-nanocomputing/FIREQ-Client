@@ -16,7 +16,7 @@ acquisition IP.
 | :--- | :--- | :--- | :--- |
 | `plot_2d` | One quantity of the acquired signal against one swept variable. | `quantity`, `x-axis` | One curve per directory, with the directory names in the legend. |
 | `plot_3d_heat` | A heatmap of one quantity over two swept variables. | `quantity`, `x-axis`, `y-axis`, `dataset` | One directory at a time, picked with the `dataset` selector. |
-| `plot_iq_curve` | The acquired signal on the complex plane. | `parameter` | One scatter series per directory, plus a rotated-CDF fidelity analysis when exactly two directories are given. |
+| `plot_iq_curve` | The acquired signal on the complex plane. | `parameter` | One scatter series per directory, plus a single-shot readout fidelity analysis when exactly two directories are given. |
 
 Every swept variable that is not used as an axis, or as the curve parameter of
 `plot_iq_curve`, gets a slider, so experiments with more sweep variables than the plot has
@@ -61,11 +61,13 @@ drive_freq_sweep  shot  time  value
 - Index levels that hold a single value are treated as **fixed**, not swept: they are not
   offered as axes and get no slider. This is why a heatmap needs two sweep variables with
   more than one value each.
-- Each command needs at least one swept variable, and `plot_3d_heat` needs two. An
+- `plot_2d` needs at least one swept variable and `plot_3d_heat` needs two. An
   acquisition IP without them cannot be plotted and is reported instead, for example
-  `Not enough axes in data to plot in 2D` or `... to plot a heatmap`.
+  `Not enough axes in data to plot in 2D` or `... to plot a heatmap`. `plot_iq_curve`
+  also plots data with no swept variable, as the raw shots (see section 4.3).
 - The `shot` level is averaged before plotting, so each plotted point is the mean over the
-  shots acquired there.
+  shots acquired there. The readout fidelity analysis of `plot_iq_curve` is the exception:
+  it uses the individual shots.
 - `time` is swept for acquisitions recorded in the `raw` or `decimated` output modes. In
   `accumulated` mode the trace is integrated on-chip and `time` holds a single sample.
 - Dataframes plotted together must share the same index levels and swept variables;
@@ -183,23 +185,53 @@ Plots the acquired signal on the complex plane, one scatter series per directory
 described in section 2.2, the values are averaged over the shots, so each series holds one
 point per value of the remaining sweep variables.
 
-```text
-> plot_iq_curve exported/state_0/ exported/state_1/
-plotted 2 acquisition IP(s): axisAcquisitionIP_0, axisAcquisitionIP_1
-```
-
 | Selector | Options | Notes |
 | :--- | :--- | :--- |
 | `parameter` | the swept variables of the data | The variable that defines the curve. Every other swept variable gets a slider. |
 
-The plot starts with the last swept variable as the curve parameter. When exactly two
-directories are given, the plotter additionally compares the two data sets once the
-interactive windows are closed: it rotates them so that the line joining their means is
-horizontal, prints the separation, and shows the rotated clouds together with the
-cumulative distributions along that axis:
+The plot starts with the last swept variable as the curve parameter.
+
+For data with no sweep variable, such as the state measurements of `IQ_at_0.yaml` and
+`IQ_at_1.yaml`, the plotter scatters the raw shots of each directory, with no `parameter`
+selector, no slider and no controls window.
+
+#### Readout fidelity
+
+When exactly two directories are given, the first holding the shots prepared in state 0 and
+the second those prepared in state 1, the plotter computes the single-shot readout fidelity
+once the IQ window is closed:
 
 ```text
-maximum fidelity with threshold: <value> is equal to: <percentage>%
+> plot_iq_curve exported/state_0/ exported/state_1/
+readout fidelity axisAcquisitionIP_0: assignment 1-(ε0+ε1)/2 = 93.45% | separation 1-ε0-ε1 = 86.90% | ε0=P(1|0)=6.10% ε1=P(0|1)=7.00% | threshold 1.234e+03 (rotated axis) | shots 10000/10000
+plotted 1 acquisition IP(s): axisAcquisitionIP_0
+```
+
+The analysis uses the un-averaged shots:
+
+1. Both clouds are rotated about the midpoint of their means, so that the line joining the
+   means is horizontal, with state 1 on the right.
+2. A shot is read as 0 when its rotated real part is at or below the threshold, and as 1
+   above it. The threshold is the midpoint between consecutive distinct shot values that
+   maximises `CDF₀(t) − CDF₁(t)`.
+3. The error rates at the threshold are `ε₀ = P(read 1 | prepared 0)` and
+   `ε₁ = P(read 0 | prepared 1)`. Each is computed over the shots of its own state.
+
+| Quantity | Formula | Range |
+| :--- | :--- | :--- |
+| Assignment fidelity | `1 − (ε₀ + ε₁)/2` | 0.5 – 1 |
+| Separation | `1 − ε₀ − ε₁` | 0 – 1 |
+
+A second window shows the rotated clouds with the threshold, and the cumulative
+distributions along the rotated axis, with the legend `assignment <a>% / separation <s>%`.
+
+The analysis requires, in both directories, no swept variable other than `shot` and one
+sample per shot (`accumulated` mode). Otherwise it is skipped with a message and the IQ plot
+is still drawn:
+
+```text
+readout fidelity axisAcquisitionIP_0: skipped, state_0 sweeps ['amp'], it needs the shots of a single configuration
+readout fidelity axisAcquisitionIP_0: skipped, state_0 holds 1024 samples per shot (index level 'time'), it needs one sample per shot (accumulated mode)
 ```
 
 ---

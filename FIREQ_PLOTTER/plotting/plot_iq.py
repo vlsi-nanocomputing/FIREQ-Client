@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
+from matplotlib.widgets import RadioButtons
 
 from .common import (
     LAYOUT_BASE_BOTTOM,
@@ -21,11 +22,40 @@ from .common import (
     average_over_level,
     common_variable_axes,
     figure_is_open,
+    get_df_axes,
     slice_dataframe,
     union_index_values,
 )
+from .fidelity import ReadoutFidelity, compute_readout_fidelity, rotate_to_real_axis
 
 PARAMETER_RADIO_TITLE: str = "parameter"
+SHOT_LEVEL: str = "shot"
+TIME_LEVEL: str = "time"
+
+
+def _single_shot_issue(dataframes: Sequence[pd.DataFrame], names: Sequence[str]) -> str | None:
+    """Tell why the given dataframes are not single shots of a single configuration.
+
+    :param dataframes: un-averaged dataframes, one per prepared state.
+    :type dataframes: Sequence[pd.DataFrame]
+    :param names: name of each dataframe, used in the message.
+    :type names: Sequence[str]
+    :return: the reason, or None when every dataframe holds one sample per shot
+        and sweeps nothing but the shots.
+    :rtype: str | None
+    """
+    for name, df in zip(names, dataframes, strict=True):
+        var_axes, _ = get_df_axes(df)
+        if TIME_LEVEL in var_axes:
+            samples = df.index.get_level_values(TIME_LEVEL).nunique()
+            return (
+                f"{name} holds {samples} samples per shot (index level {TIME_LEVEL!r}), "
+                "it needs one sample per shot (accumulated mode)"
+            )
+        swept = [var for var in var_axes if var != SHOT_LEVEL]
+        if swept:
+            return f"{name} sweeps {swept}, it needs the shots of a single configuration"
+    return None
 
 
 def _plot_iq_curve(
@@ -39,7 +69,13 @@ def _plot_iq_curve(
 
     The plane holds the imaginary part of the data against the real part, and
     a selector chooses which swept variable is used as the curve parameter.
-    The remaining swept variables get a slider.
+    The remaining swept variables get a slider. When nothing is swept once the
+    data is averaged, as for a single run of shots, the raw shots of each
+    dataframe are scattered instead, with no selector and no slider.
+
+    The readout fidelity analysis always runs on the un-averaged shots, and
+    only on single-shot data: no swept variable other than the shots, and one
+    sample per shot.
 
     :param dataframes: dataframes to plot, one scatter series each.
     :type dataframes: Sequence[pd.DataFrame]
@@ -52,10 +88,12 @@ def _plot_iq_curve(
         "shot". Ignored when the level is absent.
     :type average_over: str | None
     :param cdf_analysis: run the rotated CDF analysis once the IQ figure is
-        closed. When None it runs if exactly two dataframes are given.
+        closed. When None it runs if exactly two dataframes are given and they
+        hold single shots, and is skipped with a message otherwise.
     :type cdf_analysis: bool | None
-    :raises ValueError: if there is no dataframe, no swept variable, or the
-        CDF analysis is asked for with a number of dataframes other than two.
+    :raises ValueError: if there is no dataframe, or the CDF analysis is asked
+        for with a number of dataframes other than two or on data that is not
+        single-shot.
     :return: the handles of the plot.
     :rtype: PlotHandles
     """
@@ -68,18 +106,24 @@ def _plot_iq_curve(
     plot_dfs = [average_over_level(df, average_over) for df in dataframes]
 
     var_axes = common_variable_axes(plot_dfs)
-    if not var_axes:
-        raise ValueError("Not enough axes in data to plot an IQ curve")
+    # nothing left to sweep: scatter the raw shots, the state clouds
+    shot_clouds = not var_axes
+    if shot_clouds:
+        plot_dfs = list(dataframes)
 
     run_cdf = len(plot_dfs) == 2 if cdf_analysis is None else cdf_analysis
     if run_cdf and len(plot_dfs) != 2:
         raise ValueError("CDF analysis is only supported for exactly two dataframes")
 
+    cdf_skip_reason = _single_shot_issue(dataframes, names) if run_cdf else None
+    if cdf_skip_reason is not None and cdf_analysis:
+        raise ValueError(f"Readout fidelity analysis not possible: {cdf_skip_reason}")
+
     var_values = union_index_values(plot_dfs, var_axes)
     axis_labels = list(var_axes)
 
     # the state every callback reads and writes
-    state = {"curve_param": var_axes[-1]}
+    state = {"curve_param": var_axes[-1] if var_axes else None}
 
     plt.style.use(PLOT_STYLE)
     fig, ax = plt.subplots(figsize=(7.5, 7))
@@ -109,7 +153,8 @@ def _plot_iq_curve(
         ax.set_ylim(-limit, limit)
         ax.set_xlabel("I (Real)")
         ax.set_ylabel("Q (Imag)")
-        ax.set_title(f"{ipname}\nParameter: {state['curve_param']}")
+        subtitle = "Single shots" if shot_clouds else f"Parameter: {state['curve_param']}"
+        ax.set_title(f"{ipname}\n{subtitle}")
         fig.canvas.draw_idle()
 
     def layout(slider_count: int) -> None:
@@ -136,11 +181,14 @@ def _plot_iq_curve(
 
     panel = SliderPanel(fig, update, on_layout_change=layout)
 
-    control_fig, radios = add_selector_window(
-        [SelectorSpec(PARAMETER_RADIO_TITLE, axis_labels, axis_labels.index(state["curve_param"]), on_parameter)],
-        fig,
-        title=f"{ipname} controls",
-    )
+    control_fig: Figure | None = None
+    radios: dict[str, RadioButtons] = {}
+    if not shot_clouds:
+        control_fig, radios = add_selector_window(
+            [SelectorSpec(PARAMETER_RADIO_TITLE, axis_labels, axis_labels.index(state["curve_param"]), on_parameter)],
+            fig,
+            title=f"{ipname} controls",
+        )
 
     panel.rebuild([var for var in var_axes if var != state["curve_param"]], var_values)
     if len(plot_dfs) > 1:
@@ -149,48 +197,79 @@ def _plot_iq_curve(
     plt.show()
 
     if run_cdf:
-        _plot_rotated_cdf(plot_dfs[0], plot_dfs[1], ipname=ipname)
+        if cdf_skip_reason is not None:
+            print(f"readout fidelity {ipname}: skipped, {cdf_skip_reason}")
+        else:
+            _plot_rotated_cdf(dataframes[0], dataframes[1], ipname=ipname)
 
     return PlotHandles(fig, ax, radios, panel, control_fig)
+
+
+def _cdf_steps(sorted_values: np.ndarray, low: float, high: float) -> tuple[np.ndarray, np.ndarray]:
+    """Return the vertices of an empirical CDF, to draw with ``step(..., where="post")``.
+
+    :param sorted_values: the values, sorted in ascending order.
+    :type sorted_values: np.ndarray
+    :param low: left end of the drawn range, at or below the smallest value.
+    :type low: float
+    :param high: right end of the drawn range, at or above the largest value.
+    :type high: float
+    :return: the x and y coordinates of the steps.
+    :rtype: tuple[np.ndarray, np.ndarray]
+    """
+    count = sorted_values.size
+    x = np.concatenate([[low], sorted_values, [high]])
+    y = np.concatenate([[0.0], np.arange(1, count + 1) / count, [1.0]])
+    return x, y
 
 
 def _plot_rotated_cdf(
     df_0: pd.DataFrame,
     df_1: pd.DataFrame,
     ipname: str = "default",
-) -> Figure | None:
-    """Rotate two IQ datasets and compare their cumulative distributions.
+) -> tuple[Figure | None, ReadoutFidelity | None]:
+    """Rotate two single-shot IQ datasets and compute their readout fidelity.
 
     The clouds are rotated so that the line joining their means is horizontal,
-    then the cumulative distributions along that axis are compared to find the
-    point of maximum separation, printed as a fidelity.
+    with state 1 on the right, and the threshold on that axis is chosen to
+    maximise the separation of the cumulative distributions, as computed by
+    :func:`compute_readout_fidelity`. The assignment fidelity, the separation,
+    the error rates and the threshold are printed, and the rotated clouds are
+    shown next to the cumulative distributions.
 
-    :param df_0: first dataset.
+    :param df_0: shots prepared in state 0.
     :type df_0: pd.DataFrame
-    :param df_1: second dataset.
+    :param df_1: shots prepared in state 1.
     :type df_1: pd.DataFrame
     :param ipname: name of the acquisition IP, displayed as the title.
     :type ipname: str
-    :return: the figure, or None when the datasets are too small to compare.
-    :rtype: Figure | None
+    :return: the figure and the fidelity, both None when the datasets are too
+        small to compare.
+    :rtype: tuple[Figure | None, ReadoutFidelity | None]
     """
     iq_0 = df_0[VALUE_COLUMN].to_numpy()
     iq_1 = df_1[VALUE_COLUMN].to_numpy()
 
     if iq_0.size < 2 or iq_1.size < 2:
         print("CDF analysis needs at least two samples per dataset")
-        return None
+        return None, None
 
-    mean_0 = iq_0.mean()
-    mean_1 = iq_1.mean()
+    if iq_0.mean() == iq_1.mean():
+        print(f"readout fidelity {ipname}: warning, the two datasets have the same mean, rotation angle set to 0")
 
-    mid_point = (mean_0 + mean_1) / 2
-    angle = np.angle(mean_1 - mean_0)
+    fidelity = compute_readout_fidelity(iq_0, iq_1)
+    iq_0_rot, iq_1_rot, _ = rotate_to_real_axis(iq_0, iq_1)
+    mean_0_rot = iq_0_rot.mean()
+    mean_1_rot = iq_1_rot.mean()
 
-    iq_0_rot = (iq_0 - mid_point) * np.exp(-1j * angle) + mid_point
-    iq_1_rot = (iq_1 - mid_point) * np.exp(-1j * angle) + mid_point
-    mean_0_rot = (mean_0 - mid_point) * np.exp(-1j * angle) + mid_point
-    mean_1_rot = (mean_1 - mid_point) * np.exp(-1j * angle) + mid_point
+    assignment = 100 * fidelity.assignment_fidelity
+    separation = 100 * fidelity.separation
+    print(
+        f"readout fidelity {ipname}: assignment 1-(ε0+ε1)/2 = {assignment:.2f}% | "
+        f"separation 1-ε0-ε1 = {separation:.2f}% | "
+        f"ε0=P(1|0)={100 * fidelity.eps_0:.2f}% ε1=P(0|1)={100 * fidelity.eps_1:.2f}% | "
+        f"threshold {fidelity.threshold:.3e} (rotated axis) | shots {fidelity.n_0}/{fidelity.n_1}"
+    )
 
     fig, (ax_scatter, ax_cdf) = plt.subplots(1, 2, figsize=(10, 5))
 
@@ -203,40 +282,26 @@ def _plot_rotated_cdf(
         marker="o",
         label="Means Line",
     )
+    ax_scatter.axvline(fidelity.threshold, color="red", linestyle="--", linewidth=1, label="Threshold")
     ax_scatter.set_title("Rotated IQ Plane")
     ax_scatter.set_xlabel("I (Real)")
     ax_scatter.set_ylabel("Q (Imag)")
     ax_scatter.legend()
     ax_scatter.grid(True)
 
-    x_0 = iq_0_rot.real
-    x_1 = iq_1_rot.real
+    x_0_sorted = np.sort(iq_0_rot.real)
+    x_1_sorted = np.sort(iq_1_rot.real)
+    x_min = min(x_0_sorted[0], x_1_sorted[0])
+    x_max = max(x_0_sorted[-1], x_1_sorted[-1])
 
-    x_max = max(x_0.max(), x_1.max())
-    x_min = min(x_0.min(), x_1.min())
-
-    x_0_sorted = np.sort(x_0)
-    x_1_sorted = np.sort(x_1)
-
-    x_cdf = np.linspace(x_min, x_max, endpoint=True, num=(x_0.shape[0] + x_1.shape[0]))
-
-    x_0_cdf = np.searchsorted(x_0_sorted, x_cdf, side="left") / x_0.shape[0]
-    x_1_cdf = np.searchsorted(x_1_sorted, x_cdf, side="left") / x_1.shape[0]
-
-    x_cdf_abs_diff = np.abs(x_0_cdf - x_1_cdf)
-    threshold = np.argmax(x_cdf_abs_diff)
-    fidelity = 100 * x_cdf_abs_diff[threshold]
-
-    print(f"maximum fidelity with threshold: {x_cdf[threshold]:.4g} is equal to: {fidelity:.2f}%")
-
-    ax_cdf.plot(x_cdf, x_0_cdf, label="CDF 0", linewidth=1.5)
-    ax_cdf.plot(x_cdf, x_1_cdf, label="CDF 1", linewidth=1.5)
+    ax_cdf.step(*_cdf_steps(x_0_sorted, x_min, x_max), where="post", label="CDF 0", linewidth=1.5)
+    ax_cdf.step(*_cdf_steps(x_1_sorted, x_min, x_max), where="post", label="CDF 1", linewidth=1.5)
     ax_cdf.plot(
-        [x_cdf[threshold]] * 2,
-        [x_0_cdf[threshold], x_1_cdf[threshold]],
+        [fidelity.threshold] * 2,
+        [1 - fidelity.eps_0, fidelity.eps_1],
         color="red",
         marker="o",
-        label=f"Max fidelity: {fidelity:.2f}%",
+        label=f"assignment {assignment:.2f}% / separation {separation:.2f}%",
     )
     ax_cdf.set_title("Cumulative Distribution (X-axis)")
     ax_cdf.set_xlabel("Projected X value")
@@ -248,4 +313,4 @@ def _plot_rotated_cdf(
     plt.tight_layout()
     plt.show()
 
-    return fig
+    return fig, fidelity

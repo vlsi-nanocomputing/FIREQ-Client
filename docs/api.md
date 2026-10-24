@@ -79,4 +79,7 @@ For detailed class and function signatures, select one of the submodules below:
    FIREQ_PLOTTER.plotting.plot_3d_heatmap._plot_3d_heatmap
    FIREQ_PLOTTER.plotting.plot_iq._plot_iq_curve
    FIREQ_PLOTTER.plotting.plot_iq._plot_rotated_cdf
+   FIREQ_PLOTTER.plotting.fidelity.ReadoutFidelity
+   FIREQ_PLOTTER.plotting.fidelity.compute_readout_fidelity
+   FIREQ_PLOTTER.plotting.fidelity.rotate_to_real_axis
 ```
