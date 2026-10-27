@@ -1,5 +1,6 @@
 """Tests for the readout fidelity analysis of the IQ plotter."""
 
+import logging
 import math
 
 import matplotlib
@@ -18,7 +19,8 @@ from FIREQ_PLOTTER.plotting.plot_iq import _plot_iq_curve, _plot_rotated_cdf
 
 
 @pytest.fixture(autouse=True)
-def _no_show(monkeypatch):
+def _no_show(monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
     monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
     yield
     plt.close("all")
@@ -174,7 +176,7 @@ def test_identical_values_and_equal_means():
         compute_readout_fidelity(np.array([], dtype=complex), iq)
 
 
-def test_rotated_cdf_returns_fidelity_and_prints_both_quantities(capsys):
+def test_rotated_cdf_returns_fidelity_and_logs_both_quantities(caplog):
     iq_0, iq_1 = _clouds(400, 400, seed=9)
     df_0 = pd.DataFrame({"value": iq_0})
     df_1 = pd.DataFrame({"value": iq_1})
@@ -182,7 +184,7 @@ def test_rotated_cdf_returns_fidelity_and_prints_both_quantities(capsys):
 
     assert fig is not None
     assert result == compute_readout_fidelity(iq_0, iq_1)
-    line = capsys.readouterr().out.strip()
+    line = caplog.messages[-1]
     assert line.startswith("readout fidelity ip: assignment 1-(ε0+ε1)/2 = ")
     assert "| separation 1-ε0-ε1 = " in line
     assert "| shots 400/400" in line
@@ -193,7 +195,7 @@ def test_rotated_cdf_returns_fidelity_and_prints_both_quantities(capsys):
 
 
 # 8. single-run datasets, with the default average_over="shot"
-def test_single_run_datasets_plot_clouds_and_use_every_shot(monkeypatch, capsys):
+def test_single_run_datasets_plot_clouds_and_use_every_shot(monkeypatch, caplog):
     shots = 1000
     df_0 = _frame(shots, seed=10)
     df_1 = _frame(shots, seed=11, offset=3)
@@ -210,7 +212,8 @@ def test_single_run_datasets_plot_clouds_and_use_every_shot(monkeypatch, capsys)
 
     assert len(calls) == 1
     assert (calls[0].n_0, calls[0].n_1) == (shots, shots)
-    assert f"shots {shots}/{shots}" in capsys.readouterr().out
+    assert f"shots {shots}/{shots}" in caplog.text
+    assert handles.cdf.fidelity == calls[0]
     # the raw shot clouds are scattered, with no selector and no slider
     assert [len(collection.get_offsets()) for collection in handles.axes.collections] == [shots, shots]
     assert handles.controls is None
@@ -219,12 +222,12 @@ def test_single_run_datasets_plot_clouds_and_use_every_shot(monkeypatch, capsys)
 
 
 # 9. sweep datasets
-def test_sweep_datasets_skip_or_reject(capsys):
+def test_sweep_datasets_skip_or_reject(caplog):
     sweep = {"amp": [0.1, 0.2, 0.3]}
     dataframes = [_frame(50, sweep=sweep, seed=12), _frame(50, sweep=sweep, seed=13, offset=3)]
 
     _plot_iq_curve(dataframes, ipname="ip")
-    out = capsys.readouterr().out
+    out = caplog.text
     assert "readout fidelity ip: skipped" in out
     assert "amp" in out
     assert "assignment" not in out
@@ -234,11 +237,11 @@ def test_sweep_datasets_skip_or_reject(capsys):
 
 
 # 10. time traces
-def test_time_traces_skip_or_reject(capsys):
+def test_time_traces_skip_or_reject(caplog):
     dataframes = [_frame(50, times=4, seed=14), _frame(50, times=4, seed=15, offset=3)]
 
     _plot_iq_curve(dataframes, ipname="ip")
-    out = capsys.readouterr().out
+    out = caplog.text
     assert "readout fidelity ip: skipped" in out
     assert "4 samples per shot" in out
 

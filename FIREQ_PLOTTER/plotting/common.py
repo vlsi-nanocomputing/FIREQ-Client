@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,6 +13,8 @@ import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.widgets import RadioButtons, Slider
+
+log = logging.getLogger(__name__)
 
 VALUE_COLUMN: str = "value"
 PLOT_STYLE: str = "seaborn-v0_8-darkgrid"
@@ -63,8 +66,10 @@ class SelectorSpec(NamedTuple):
 class PlotHandles(NamedTuple):
     """The interactive elements of a plot, returned for inspection and tests.
 
-    A plot without selectors has no controls window: ``radios`` is then empty
-    and ``controls`` is None.
+    A plot without selectors (or a static one) has no controls window:
+    ``radios`` is then empty and ``controls`` is None. The widgets stop
+    responding once the handles are garbage collected; the open figures are
+    kept in a registry, pruned of the closed ones at every new plot.
     """
 
     figure: Figure
@@ -72,6 +77,59 @@ class PlotHandles(NamedTuple):
     radios: dict[str, RadioButtons]
     panel: SliderPanel
     controls: Figure | None
+    #: the readout fidelity analysis of an IQ plot, when it ran
+    cdf: Any = None
+
+
+#: handles of the open figures, so their widgets survive when the caller drops the handles
+_OPEN_PLOTS: dict[int, PlotHandles] = {}
+
+
+def finish_plot(handles: PlotHandles, show: bool, block: bool | None) -> PlotHandles:
+    """Keep the handles while the figure is open, and show the figures if asked.
+
+    :param handles: the handles of the new plot.
+    :type handles: PlotHandles
+    :param show: call ``plt.show``.
+    :type show: bool
+    :param block: forwarded to ``plt.show``; None keeps its default (blocks in a script, not in Jupyter).
+    :type block: bool | None
+    :return: the handles.
+    :rtype: PlotHandles
+    """
+    for number in [number for number in _OPEN_PLOTS if not plt.fignum_exists(number)]:
+        del _OPEN_PLOTS[number]
+    _OPEN_PLOTS[handles.figure.number] = handles
+    if show:
+        show_figures(block)
+    return handles
+
+
+def show_figures(block: bool | None = None) -> None:
+    """Show the open figures.
+
+    :param block: forwarded to ``plt.show``; None keeps its default.
+    :type block: bool | None
+    """
+    if block is None:
+        plt.show()
+    else:
+        plt.show(block=block)
+
+
+def check_choice(kind: str, value: str | None, choices: Sequence[str]) -> None:
+    """Check a preset value against the options of its selector.
+
+    :param kind: name of the option, used in the message.
+    :type kind: str
+    :param value: the preset, None for the default.
+    :type value: str | None
+    :param choices: the valid values.
+    :type choices: Sequence[str]
+    :raises ValueError: if the value is not a valid choice.
+    """
+    if value is not None and value not in choices:
+        raise ValueError(f"Invalid {kind} {value!r}, choose one of {list(choices)}")
 
 
 def _unwrap_phase(values: np.ndarray) -> np.ndarray:
@@ -127,7 +185,18 @@ def _dataset_names(exp_dirs: Sequence[Path]) -> list[str]:
     :return: the directory basenames, made unique with a suffix when they repeat.
     :rtype: list[str]
     """
-    names = [exp_dir.name for exp_dir in exp_dirs]
+    return unique_names([exp_dir.name for exp_dir in exp_dirs])
+
+
+def unique_names(names: Sequence[str]) -> list[str]:
+    """Make display names unique, with an index suffix when they repeat.
+
+    :param names: the names.
+    :type names: Sequence[str]
+    :return: the unique names.
+    :rtype: list[str]
+    """
+    names = list(names)
     if len(set(names)) != len(names):
         names = [f"{name} ({index})" for index, name in enumerate(names)]
     return names
@@ -146,7 +215,7 @@ def load_and_plot(
     directories, with a list of dataframes (one per directory, in the same
     order as exp_dirs), the ip name and the directory names. A failure while
     plotting one IP does not prevent the other IPs from being plotted unless
-    raise_on_error is set.
+    raise_on_error is set. See :func:`plot_datasets`.
 
     :param exp_dirs: directories of the exported experiments to load.
     :type exp_dirs: Sequence[Path]
@@ -173,24 +242,57 @@ def load_and_plot(
             raise ValueError(f"no data_<ipname>.pkl files found in {exp_dir}")
         all_dataframes.append(loaded)
 
-    # ip names common to every loaded experiment
-    common_ips = set.intersection(*(set(loaded) for loaded in all_dataframes))
-    if not common_ips:
-        raise ValueError("No IP names are common to all provided experiment directories")
+    datasets = list(zip(_dataset_names(dirs), all_dataframes, strict=True))
+    return list(plot_datasets(datasets, plotting_func, raise_on_error=raise_on_error, **kwargs))
 
-    dataset_names = _dataset_names(dirs)
-    plotted = []
+
+def plot_datasets(
+    datasets: Sequence[tuple[str, Mapping[str, pd.DataFrame]]],
+    plotting_func: Callable[..., Any],
+    *,
+    ip: str | None = None,
+    raise_on_error: bool = True,
+    **kwargs: object,
+) -> dict[str, Any]:
+    """Plot named datasets, once per acquisition IP common to all of them.
+
+    :param datasets: (name, dataframes by ip name) pairs, one per experiment.
+    :type datasets: Sequence[tuple[str, Mapping[str, pd.DataFrame]]]
+    :param plotting_func: callable receiving the dataframes, the ip name, the
+        dataset names and any extra keyword argument, and producing the plot.
+    :type plotting_func: Callable[..., Any]
+    :param ip: plot only this acquisition IP.
+    :type ip: str | None
+    :param raise_on_error: re-raise plotting errors instead of logging them
+        and going on with the other IPs.
+    :type raise_on_error: bool
+    :param kwargs: additional keyword arguments forwarded to plotting_func.
+    :type kwargs: object
+    :raises ValueError: if no IP is common to all datasets, or ``ip`` is not one of them.
+    :return: what plotting_func returned, keyed by the ip names that were plotted.
+    :rtype: dict[str, Any]
+    """
+    if not datasets:
+        raise ValueError("at least one dataset is required")
+    # ip names common to every dataset
+    common_ips = set.intersection(*(set(frames) for _, frames in datasets))
+    if not common_ips:
+        raise ValueError("No IP names are common to all provided experiments")
+    if ip is not None:
+        if ip not in common_ips:
+            raise ValueError(f"Unknown IP {ip!r}, the data has {sorted(common_ips)}")
+        common_ips = {ip}
+
+    dataset_names = [name for name, _ in datasets]
+    plotted = {}
     for ipname in sorted(common_ips):
-        dataframes = [loaded[ipname] for loaded in all_dataframes]
+        dataframes = [frames[ipname] for _, frames in datasets]
         try:
-            plotting_func(dataframes, ipname=ipname, dataset_names=dataset_names, **kwargs)
+            plotted[ipname] = plotting_func(dataframes, ipname=ipname, dataset_names=dataset_names, **kwargs)
         except Exception as err:
             if raise_on_error:
                 raise
-            print(f"Failed to plot {ipname}: {type(err).__name__}: {err}")
-            continue
-        plotted.append(ipname)
-
+            log.error(f"Failed to plot {ipname}: {type(err).__name__}: {err}")
     return plotted
 
 
@@ -537,6 +639,8 @@ class SliderPanel:
         update: Callable[[], None],
         *,
         on_layout_change: Callable[[int], None] | None = None,
+        initial: Mapping[str, float] | None = None,
+        interactive: bool = True,
         left: float = SLIDER_LEFT,
         width: float = SLIDER_WIDTH,
         bottom: float = SLIDER_BOTTOM,
@@ -552,6 +656,12 @@ class SliderPanel:
         :param on_layout_change: callback invoked with the number of live
             sliders after every rebuild, to reserve room for them.
         :type on_layout_change: Callable[[int], None] | None
+        :param initial: value each slider starts at, snapped to the closest
+            available one; the first value otherwise.
+        :type initial: Mapping[str, float] | None
+        :param interactive: draw the sliders; when False the selection stays
+            at the initial values and no widget is drawn.
+        :type interactive: bool
         :param left: left edge of the sliders, in figure fractions.
         :type left: float
         :param width: width of the sliders, in figure fractions.
@@ -566,6 +676,8 @@ class SliderPanel:
         self._fig = fig
         self._update = update
         self._on_layout_change = on_layout_change
+        self._initial = dict(initial or {})
+        self._interactive = interactive
         self._left = left
         self._width = width
         self._bottom = bottom
@@ -574,6 +686,8 @@ class SliderPanel:
         self._sliders: dict[str, Slider] = {}
         self._axes: dict[str, Axes] = {}
         self._values: dict[str, np.ndarray] = {}
+        # selected index of each variable of a static panel
+        self._fixed: dict[str, int] = {}
 
     def rebuild(self, slider_vars: Sequence[str], var_values: Mapping[str, np.ndarray]) -> None:
         """Replace the slider stack with one slider per given variable.
@@ -584,18 +698,26 @@ class SliderPanel:
         :type var_values: Mapping[str, np.ndarray]
         """
         self.clear()
-        for index, var in enumerate(slider_vars):
+        for var in slider_vars:
             values = np.asarray(var_values[var])
             if values.size < 2:
                 continue
             self._values[var] = values
-            slider_ax = self._fig.add_axes((self._left, self._bottom + self._stride * index, self._width, self._height))
+            start = 0
+            if var in self._initial:
+                start = int(np.argmin(np.abs(values - self._initial[var])))
+            if not self._interactive:
+                self._fixed[var] = start
+                continue
+            slider_ax = self._fig.add_axes(
+                (self._left, self._bottom + self._stride * len(self._sliders), self._width, self._height)
+            )
             slider = Slider(
                 slider_ax,
                 var,
                 valmin=0,
                 valmax=values.size - 1,
-                valinit=0,
+                valinit=start,
                 valstep=1,
                 valfmt=make_formatter(var, values),
             )
@@ -616,6 +738,7 @@ class SliderPanel:
         self._sliders = {}
         self._axes = {}
         self._values = {}
+        self._fixed = {}
 
     def _on_slider(self, _value: float) -> None:
         """Redraw the plot after a slider moved.
@@ -633,6 +756,8 @@ class SliderPanel:
         :return: the slider position, snapped to a valid index.
         :rtype: int
         """
+        if var in self._fixed:
+            return self._fixed[var]
         values = self._values[var]
         return int(np.clip(round(self._sliders[var].val), 0, values.size - 1))
 
@@ -652,7 +777,7 @@ class SliderPanel:
         :return: the selected value for each variable of the panel.
         :rtype: dict[str, float]
         """
-        return {var: self.selected_value(var) for var in self._sliders}
+        return {var: self.selected_value(var) for var in self._values}
 
     @property
     def slider_vars(self) -> list[str]:

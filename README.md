@@ -43,6 +43,7 @@ FIREQ-Client/
 ├── yaml_experiment_configurations_examples/         Example experiment YAML configurations
 ├── testing/                                         Test scripts
 ├── docs/                                            Client-specific documentation
+├── examples/                                        Scripting examples (client and plotter API)
 ├── run_client.py                                    Minimal client entry point
 ├── run_plotter.py                                   Plotter entry point
 ├── requirements.txt                                 Python dependencies

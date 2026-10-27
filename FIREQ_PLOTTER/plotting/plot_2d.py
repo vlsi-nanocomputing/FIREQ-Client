@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,8 +19,10 @@ from .common import (
     SliderPanel,
     add_selector_window,
     average_over_level,
+    check_choice,
     common_variable_axes,
     figure_is_open,
+    finish_plot,
     slice_dataframe,
     union_index_values,
 )
@@ -70,11 +72,19 @@ def _plot_2d(
     ipname: str = "default",
     dataset_names: Sequence[str] | None = None,
     average_over: str | None = "shot",
+    *,
+    quantity: str | None = None,
+    x: str | None = None,
+    selection: Mapping[str, float] | None = None,
+    interactive: bool = True,
+    show: bool = True,
+    block: bool | None = None,
 ) -> PlotHandles:
     """Interactively plot the experiment data as curves.
 
     The figure holds a quantity selector, an x-axis selector and one slider
     per remaining swept variable. Each dataframe is drawn as its own series.
+    The presets choose what the selectors and the sliders start at.
 
     :param dataframes: dataframes to plot, one series each.
     :type dataframes: Sequence[pd.DataFrame]
@@ -86,7 +96,21 @@ def _plot_2d(
     :param average_over: average the values of this index level, usually
         "shot". Ignored when the level is absent.
     :type average_over: str | None
-    :raises ValueError: if there is no dataframe or no swept variable.
+    :param quantity: quantity to plot, a key of ``PLOT_2D_SERIES``.
+    :type quantity: str | None
+    :param x: variable on the x axis, the innermost one by default.
+    :type x: str | None
+    :param selection: value of the other swept variables (the slider positions).
+    :type selection: Mapping[str, float] | None
+    :param interactive: draw the selectors and the sliders; when False the
+        figure is static.
+    :type interactive: bool
+    :param show: show the figure.
+    :type show: bool
+    :param block: forwarded to ``plt.show``.
+    :type block: bool | None
+    :raises ValueError: if there is no dataframe, no swept variable, or a
+        preset is not one of the options.
     :return: the handles of the plot.
     :rtype: PlotHandles
     """
@@ -105,9 +129,11 @@ def _plot_2d(
     var_values = union_index_values(plot_dfs, var_axes)
     quantity_keys = list(PLOT_2D_SERIES)
     label_to_key = {QUANTITY_SPECS[key].label: key for key in quantity_keys}
+    check_choice("quantity", quantity, quantity_keys)
+    check_choice("x axis", x, var_axes)
 
     # the state every callback reads and writes
-    state = {"quantity": quantity_keys[0], "x_axis": var_axes[-1]}
+    state = {"quantity": quantity or quantity_keys[0], "x_axis": x or var_axes[-1]}
 
     plt.style.use(PLOT_STYLE)
     fig, ax = plt.subplots(figsize=(9, 5.5))
@@ -209,24 +235,25 @@ def _plot_2d(
         state["x_axis"] = label
         panel.rebuild([var for var in var_axes if var != label], var_values)
 
-    panel = SliderPanel(fig, update, on_layout_change=layout)
+    panel = SliderPanel(fig, update, on_layout_change=layout, initial=selection, interactive=interactive)
 
-    control_fig, radios = add_selector_window(
-        [
-            SelectorSpec(
-                QUANTITY_RADIO_TITLE,
-                [QUANTITY_SPECS[key].label for key in quantity_keys],
-                quantity_keys.index(state["quantity"]),
-                on_quantity,
-            ),
-            SelectorSpec(X_AXIS_RADIO_TITLE, list(var_axes), var_axes.index(state["x_axis"]), on_x_axis),
-        ],
-        fig,
-        title=f"{ipname} controls",
-    )
+    control_fig, radios = None, {}
+    if interactive:
+        control_fig, radios = add_selector_window(
+            [
+                SelectorSpec(
+                    QUANTITY_RADIO_TITLE,
+                    [QUANTITY_SPECS[key].label for key in quantity_keys],
+                    quantity_keys.index(state["quantity"]),
+                    on_quantity,
+                ),
+                SelectorSpec(X_AXIS_RADIO_TITLE, list(var_axes), var_axes.index(state["x_axis"]), on_x_axis),
+            ],
+            fig,
+            title=f"{ipname} controls",
+        )
 
     panel.rebuild([var for var in var_axes if var != state["x_axis"]], var_values)
     refresh_legend()
 
-    plt.show()
-    return PlotHandles(fig, ax, radios, panel, control_fig)
+    return finish_plot(PlotHandles(fig, ax, radios, panel, control_fig), show, block)

@@ -1,7 +1,8 @@
-"""Interactive plotter for FIREQ experiment data."""
+"""Interactive plotter for FIREQ experiment data (the REPL on top of the plot functions)."""
 
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 from collections.abc import Callable, Iterable, Sequence
@@ -14,7 +15,7 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory
 
 from .plotting import _plot_2d, _plot_3d_heatmap, _plot_iq_curve
-from .plotting.common import load_and_plot
+from .plotting.common import load_and_plot, show_figures
 
 #: the plotting commands of the REPL, mapped to the function that runs them.
 PLOT_COMMANDS: dict[str, Callable[..., object]] = {
@@ -116,6 +117,8 @@ def parse_experiment_dirs(tokens: Sequence[str]) -> list[Path]:
 
 def main() -> None:
     """Run the interactive plotter REPL."""
+    # the plot functions log their results (e.g. the readout fidelity) instead of printing them
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     history_file = os.path.expanduser("~/.plotter_history")
     session = PromptSession(
         history=FileHistory(history_file),
@@ -153,7 +156,8 @@ def main() -> None:
 
         try:
             exp_dirs = parse_experiment_dirs(arguments)
-            plotted = load_and_plot(exp_dirs, plotting_func)
+            plotted = load_and_plot(exp_dirs, plotting_func, show=False)
+            show_figures()
         except KeyboardInterrupt:
             print("plot interrupted")
             continue

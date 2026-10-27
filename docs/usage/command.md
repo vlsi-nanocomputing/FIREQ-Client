@@ -8,7 +8,8 @@ The interactive shell provides a direct interface to control the FIREQ server, c
 
 | Command | Description |
 | :--- | :--- |
-| `ping` | Sends a ping request and prints the server response. |
+| `ping` | Sends a ping request and prints the round-trip time. |
+| `reconnect` | Opens the connection again, after a lost connection, a timeout or `Ctrl-C` during a run. |
 | `quit`, `exit` | Gracefully closes the active interactive session and disconnects from the server. `Ctrl-C` at the prompt takes the same path. |
 
 ---
@@ -17,8 +18,10 @@ The interactive shell provides a direct interface to control the FIREQ server, c
 
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
-| `run_yaml` | `<file.yaml>` | Loads the specified YAML configuration, compiles sweep variables, and initiates full experiment execution. |
-| `config_yaml` | `<file.yaml>` | Loads the specified YAML configuration and applies it to the server without running the experiment. |
+| `run_yaml` | `<file.yaml> [name=value ...]` | Loads the specified YAML configuration, compiles sweep variables, and initiates full experiment execution. The `name=value` pairs override the `preprocess` values. |
+| `config_yaml` | `<file.yaml> [name=value ...]` | Loads the specified YAML configuration and applies it to the server without running the experiment. |
+| `last` | — | Prints the summary of the last run. |
+| `plot_2d`, `plot_3d_heat`, `plot_iq` | `last` or `<dir> [<dir> ...]` | Plots the last run, or experiment directories (needs `matplotlib`). |
 | `export` | `<source_dir> <target_dir>` | Combines an experiment directory, or a tree of experiment directories, into exported data holding a `data_<acquisition_ip_name>.pkl` and `data_<acquisition_ip_name>.csv` pair per acquisition IP. |
 | `reset_all` | — | Resets server-side memory buffers, clears IP registers, and restores the system tree to its default state. |
 

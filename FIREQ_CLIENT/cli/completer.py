@@ -25,11 +25,14 @@ class CommandCompleter(Completer):
         # Define what arguments each command expects (command -> per-arg completers).
         # Commands not listed here (ping, set_nyquist, quit, ...) get no suggestions
         # in argument position. Note: commands are matched case-sensitively, exactly
-        # like _dispatch_command.
+        # like InteractiveShell.dispatch.
         self.argument_specs = {
             "config_yaml": [self.yaml_completer],
             "run_yaml": [self.yaml_completer],
             "export": [self.dir_completer, self.dir_completer],
+            "plot_2d": [self.dir_completer],
+            "plot_3d_heat": [self.dir_completer],
+            "plot_iq": [self.dir_completer],
         }
         commands = [
             "ping",
@@ -40,6 +43,11 @@ class CommandCompleter(Completer):
             "set_nyquist",
             "trigger_manually",
             "export",
+            "last",
+            "reconnect",
+            "plot_2d",
+            "plot_3d_heat",
+            "plot_iq",
             "quit",
             "exit",
         ]

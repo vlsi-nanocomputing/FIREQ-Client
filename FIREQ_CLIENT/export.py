@@ -1,6 +1,7 @@
 """Export of experiment data."""
 
 import itertools
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+
+log = logging.getLogger(__name__)
 
 
 def export(from_dir: Path, to_dir: Path) -> None:
@@ -36,7 +39,7 @@ def export_experiment(from_dir: Path, to_dir: Path) -> None:
     :param to_dir: destination directory.
     :type to_dir: Path
     """
-    print(f"exporting {from_dir}   to   {to_dir} ......")
+    log.info(f"Exporting {from_dir} to {to_dir}")
     os.makedirs(to_dir, exist_ok=True)
 
     # Load experiment summary
@@ -81,8 +84,11 @@ def load_dataframe(var_order: list[str], var_values: dict[str, np.ndarray], sour
     configs = []
     frames = []
     for point in itertools.product(*[range(len(var_values[v])) for v in var_order]):
-        frame_name = f"data_{'_'.join(map(str, point))}"
-        frame_df = pd.read_pickle(f"{source_dir}/{frame_name}.pkl")
+        frame_path = Path(source_dir) / f"data_{'_'.join(map(str, point))}.pkl"
+        # an aborted run leaves the points after the abort without data
+        if not frame_path.exists():
+            continue
+        frame_df = pd.read_pickle(frame_path)
 
         # Get the current var values, index from the checkpoint into the var values
         config = tuple(var_values[var][idx] for var, idx in zip(var_order, point, strict=True))

@@ -10,6 +10,8 @@ The client is primarily used through an interactive command loop started by:
 python run_client.py
 ```
 
+The same features are available from Python scripts, see [Scripting](usage/scripting.md).
+
 ## Guideline
 
 Below is the complete guideline reference.
@@ -21,4 +23,5 @@ usage/command
 usage/experiment_definition
 usage/output
 usage/plot
+usage/scripting
 ```

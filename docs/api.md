@@ -18,7 +18,7 @@ The client framework is organized into three main operational layers:
 
 A standard client runtime lifecycle proceeds as follows:
 
-1. **Instantiation & Connection**: The `Client` instance connects to the specified `<SERVER_IP>:<SERVER_PORT>` endpoint.
+1. **Instantiation & Connection**: The `FireqClient` instance connects to the specified `<SERVER_IP>:<SERVER_PORT>` endpoint.
 2. **Handshake & Auth**: Performs authentication via shared token validation.
 3. **YAML Preprocessing**: Loads `.yaml` experiment definitions and resolves internal variable placeholders.
 4. **Command Execution**: Dispatches execution requests.
@@ -37,8 +37,15 @@ For detailed class and function signatures, select one of the submodules below:
    :toctree: _autosummary
    :nosignatures:
 
-   FIREQ_CLIENT.client.Client
-   FIREQ_CLIENT.prompt_completer
+   FIREQ_CLIENT.client.FireqClient
+   FIREQ_CLIENT.client.RunIterator
+   FIREQ_CLIENT.results
+   FIREQ_CLIENT.errors
+   FIREQ_CLIENT.config
+   FIREQ_CLIENT.storage
+   FIREQ_CLIENT.cli
+   FIREQ_CLIENT.cli.shell
+   FIREQ_CLIENT.cli.completer
 
 .. rubric:: Protocol & Socket Workers
 
@@ -72,8 +79,10 @@ For detailed class and function signatures, select one of the submodules below:
    :toctree: _autosummary
    :nosignatures:
 
-   FIREQ_PLOTTER.plotter.CommandCompleter
-   FIREQ_PLOTTER.plotter.main
+   FIREQ_PLOTTER.api
+   FIREQ_PLOTTER.data
+   FIREQ_PLOTTER.cli.CommandCompleter
+   FIREQ_PLOTTER.cli.main
    FIREQ_PLOTTER.plotting.common.load_and_plot
    FIREQ_PLOTTER.plotting.plot_2d._plot_2d
    FIREQ_PLOTTER.plotting.plot_3d_heatmap._plot_3d_heatmap

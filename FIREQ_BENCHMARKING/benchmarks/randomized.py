@@ -4,13 +4,9 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
-import yaml
 
 from FIREQ_BENCHMARKING.utils.yaml_generator import YAMLGenerator
-from FIREQ_CLIENT.client import Client
-from FIREQ_CLIENT.export import export
-
+from FIREQ_CLIENT import ExperimentResult, FireqClient
 
 # Server configuration
 HOST = "0.0.0.0"
@@ -25,7 +21,6 @@ SEQUENCES_PER_LENGTH = 10
 # Output directories
 BENCHMARK_DIR = Path(__file__).resolve().parents[2]
 GENERATED_DIR = BENCHMARK_DIR / "generated"
-EXPORT_DIR = BENCHMARK_DIR / "exported"
 RESULTS_DIR = BENCHMARK_DIR / "results"
 
 # Qubit and setup parameters
@@ -104,39 +99,18 @@ CLIFFORDS = build_cliffords()
 CLIFFORD_LOOKUP = {unitary_key(unitary): sequence for unitary, sequence in CLIFFORDS}
 
 
-def latest_experiment(client: Client, name: str) -> Path:
-    """Return the latest output directory for an experiment."""
-    experiment_dir = Path(client.output_dir) / name
-    return max(experiment_dir.glob("experiment_*"), key=lambda path: path.stat().st_mtime)
+def run_experiment(client: FireqClient, yaml_path: Path) -> ExperimentResult:
+    """Run a generated FIREQ experiment, failing if the server aborted it."""
+    # the v0 server needs a reset before every new configuration
+    result = client.run(yaml_path, reset_before=True)
+    result.raise_for_status()
+    return result
 
 
-def run_experiment(client: Client, yaml_path: Path) -> Path:
-    """Run a generated FIREQ experiment and return its exported directory."""
-    client._run_yaml(str(yaml_path))
-    return export_experiment(latest_experiment(client, yaml_path.stem), yaml_path.stem)
-
-
-def export_experiment(experiment_dir: Path, name: str) -> Path:
-    """Export a FIREQ experiment."""
-    output_dir = EXPORT_DIR / name
-    export(experiment_dir, output_dir)
-    return output_dir
-
-
-def load_exported(export_dir: Path) -> pd.DataFrame:
-    """Load the data of an exported experiment with a single acquisition source."""
-    # shortcut: takes the first source only, upgrade when acquiring from more than one IP
-    return pd.read_pickle(next(export_dir.glob("data_*.pkl")))
-
-
-def calibrate_rabi(experiment_dir: Path) -> float:
+def calibrate_rabi(result: ExperimentResult) -> float:
     """Estimate the pi-pulse gain from a Rabi experiment."""
-    dataframe = load_exported(experiment_dir)
-
-    with open(experiment_dir / "experiment_summary.yaml", encoding="utf-8") as file:
-        summary = yaml.unsafe_load(file)
-
-    gains = np.asarray(summary["var_values"]["gain_sweep"], dtype=float)
+    dataframe = result.dataframe()
+    gains = np.asarray(result.variable_values["gain_sweep"], dtype=float)
     iq = dataframe.groupby(level="gain_sweep")["value"].mean().to_numpy()
 
     # Project the IQ trajectory onto its principal direction
@@ -202,7 +176,9 @@ def randomized_parameters(drive_order: list[str], gain_pi: float) -> dict:
     }
 
 
-def run_randomized(client: Client, generator: YAMLGenerator, name: str, drive_order: list[str], gain_pi: float) -> complex:
+def run_randomized(
+    client: FireqClient, generator: YAMLGenerator, name: str, drive_order: list[str], gain_pi: float
+) -> complex:
     """Generate, run, and return the mean IQ value of one randomized experiment."""
     yaml_path = generator.generate(
         experiment="randomized",
@@ -210,8 +186,7 @@ def run_randomized(client: Client, generator: YAMLGenerator, name: str, drive_or
         output_path=GENERATED_DIR / f"{name}.yaml",
     )
 
-    client._reset_all()
-    dataframe = load_exported(run_experiment(client, yaml_path))
+    dataframe = run_experiment(client, yaml_path).dataframe()
 
     return complex(dataframe["value"].mean())
 
@@ -279,13 +254,7 @@ def main() -> None:
     """Run the complete single-qubit randomized benchmarking flow."""
     generator = YAMLGenerator()
     rng = np.random.default_rng(SEED)
-    client = Client(HOST, PORT)
-
-    try:
-        client._connect()
-        client._do_handshake()
-        client._reset_all()
-
+    with FireqClient(HOST, PORT) as client:
         # Run the Rabi calibration
         rabi_yaml = generator.generate(
             experiment="rabi",
@@ -331,9 +300,6 @@ def main() -> None:
         print(f"RB decay: {decay:.8f}")
         print(f"Error per Clifford: {epc:.8e}")
         print(f"Clifford fidelity: {1.0 - epc:.8f}")
-
-    finally:
-        client._disconnect()
 
 
 if __name__ == "__main__":

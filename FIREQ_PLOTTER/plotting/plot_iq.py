@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
+from collections.abc import Mapping, Sequence
+from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,17 +22,33 @@ from .common import (
     SliderPanel,
     add_selector_window,
     average_over_level,
+    check_choice,
     common_variable_axes,
     figure_is_open,
+    finish_plot,
     get_df_axes,
+    show_figures,
     slice_dataframe,
     union_index_values,
 )
 from .fidelity import ReadoutFidelity, compute_readout_fidelity, rotate_to_real_axis
 
+log = logging.getLogger(__name__)
+
 PARAMETER_RADIO_TITLE: str = "parameter"
 SHOT_LEVEL: str = "shot"
 TIME_LEVEL: str = "time"
+
+
+class CdfResult(NamedTuple):
+    """The readout fidelity analysis of two single-shot datasets.
+
+    Both fields are None when the datasets are too small to compare.
+    """
+
+    #: the rotated clouds and their cumulative distributions, None when not plotted
+    figure: Figure | None
+    fidelity: ReadoutFidelity | None
 
 
 def _single_shot_issue(dataframes: Sequence[pd.DataFrame], names: Sequence[str]) -> str | None:
@@ -64,6 +82,12 @@ def _plot_iq_curve(
     dataset_names: Sequence[str] | None = None,
     average_over: str | None = "shot",
     cdf_analysis: bool | None = None,
+    *,
+    curve_parameter: str | None = None,
+    selection: Mapping[str, float] | None = None,
+    interactive: bool = True,
+    show: bool = True,
+    block: bool | None = None,
 ) -> PlotHandles:
     """Plot the data of one or more experiments on an IQ plane.
 
@@ -87,10 +111,23 @@ def _plot_iq_curve(
     :param average_over: average the values of this index level, usually
         "shot". Ignored when the level is absent.
     :type average_over: str | None
-    :param cdf_analysis: run the rotated CDF analysis once the IQ figure is
-        closed. When None it runs if exactly two dataframes are given and they
-        hold single shots, and is skipped with a message otherwise.
+    :param cdf_analysis: run the rotated CDF analysis, drawn in its own
+        figure, with its result in ``cdf`` of the handles. When None it runs if
+        exactly two dataframes are given and they hold single shots, and is
+        skipped with a log message otherwise.
     :type cdf_analysis: bool | None
+    :param curve_parameter: swept variable used as the curve parameter, the
+        innermost one by default.
+    :type curve_parameter: str | None
+    :param selection: value of the other swept variables (the slider positions).
+    :type selection: Mapping[str, float] | None
+    :param interactive: draw the selector and the sliders; when False the
+        figure is static.
+    :type interactive: bool
+    :param show: show the figures.
+    :type show: bool
+    :param block: forwarded to ``plt.show``.
+    :type block: bool | None
     :raises ValueError: if there is no dataframe, or the CDF analysis is asked
         for with a number of dataframes other than two or on data that is not
         single-shot.
@@ -121,9 +158,10 @@ def _plot_iq_curve(
 
     var_values = union_index_values(plot_dfs, var_axes)
     axis_labels = list(var_axes)
+    check_choice("curve parameter", curve_parameter, var_axes)
 
     # the state every callback reads and writes
-    state = {"curve_param": var_axes[-1] if var_axes else None}
+    state = {"curve_param": curve_parameter or (var_axes[-1] if var_axes else None)}
 
     plt.style.use(PLOT_STYLE)
     fig, ax = plt.subplots(figsize=(7.5, 7))
@@ -179,11 +217,11 @@ def _plot_iq_curve(
         state["curve_param"] = label
         panel.rebuild([var for var in var_axes if var != label], var_values)
 
-    panel = SliderPanel(fig, update, on_layout_change=layout)
+    panel = SliderPanel(fig, update, on_layout_change=layout, initial=selection, interactive=interactive)
 
     control_fig: Figure | None = None
     radios: dict[str, RadioButtons] = {}
-    if not shot_clouds:
+    if interactive and not shot_clouds:
         control_fig, radios = add_selector_window(
             [SelectorSpec(PARAMETER_RADIO_TITLE, axis_labels, axis_labels.index(state["curve_param"]), on_parameter)],
             fig,
@@ -194,15 +232,14 @@ def _plot_iq_curve(
     if len(plot_dfs) > 1:
         ax.legend(loc="best")
 
-    plt.show()
-
+    cdf = None
     if run_cdf:
         if cdf_skip_reason is not None:
-            print(f"readout fidelity {ipname}: skipped, {cdf_skip_reason}")
+            log.info(f"readout fidelity {ipname}: skipped, {cdf_skip_reason}")
         else:
-            _plot_rotated_cdf(dataframes[0], dataframes[1], ipname=ipname)
+            cdf = _plot_rotated_cdf(dataframes[0], dataframes[1], ipname=ipname, show=False)
 
-    return PlotHandles(fig, ax, radios, panel, control_fig)
+    return finish_plot(PlotHandles(fig, ax, radios, panel, control_fig, cdf), show, block)
 
 
 def _cdf_steps(sorted_values: np.ndarray, low: float, high: float) -> tuple[np.ndarray, np.ndarray]:
@@ -227,15 +264,19 @@ def _plot_rotated_cdf(
     df_0: pd.DataFrame,
     df_1: pd.DataFrame,
     ipname: str = "default",
-) -> tuple[Figure | None, ReadoutFidelity | None]:
+    *,
+    plot: bool = True,
+    show: bool = True,
+    block: bool | None = None,
+) -> CdfResult:
     """Rotate two single-shot IQ datasets and compute their readout fidelity.
 
     The clouds are rotated so that the line joining their means is horizontal,
     with state 1 on the right, and the threshold on that axis is chosen to
     maximise the separation of the cumulative distributions, as computed by
     :func:`compute_readout_fidelity`. The assignment fidelity, the separation,
-    the error rates and the threshold are printed, and the rotated clouds are
-    shown next to the cumulative distributions.
+    the error rates and the threshold are logged, and the rotated clouds are
+    drawn next to the cumulative distributions.
 
     :param df_0: shots prepared in state 0.
     :type df_0: pd.DataFrame
@@ -243,19 +284,25 @@ def _plot_rotated_cdf(
     :type df_1: pd.DataFrame
     :param ipname: name of the acquisition IP, displayed as the title.
     :type ipname: str
+    :param plot: draw the figure.
+    :type plot: bool
+    :param show: show the figure.
+    :type show: bool
+    :param block: forwarded to ``plt.show``.
+    :type block: bool | None
     :return: the figure and the fidelity, both None when the datasets are too
         small to compare.
-    :rtype: tuple[Figure | None, ReadoutFidelity | None]
+    :rtype: CdfResult
     """
     iq_0 = df_0[VALUE_COLUMN].to_numpy()
     iq_1 = df_1[VALUE_COLUMN].to_numpy()
 
     if iq_0.size < 2 or iq_1.size < 2:
-        print("CDF analysis needs at least two samples per dataset")
-        return None, None
+        log.warning("CDF analysis needs at least two samples per dataset")
+        return CdfResult(None, None)
 
     if iq_0.mean() == iq_1.mean():
-        print(f"readout fidelity {ipname}: warning, the two datasets have the same mean, rotation angle set to 0")
+        log.warning(f"readout fidelity {ipname}: warning, the two datasets have the same mean, rotation angle set to 0")
 
     fidelity = compute_readout_fidelity(iq_0, iq_1)
     iq_0_rot, iq_1_rot, _ = rotate_to_real_axis(iq_0, iq_1)
@@ -264,12 +311,15 @@ def _plot_rotated_cdf(
 
     assignment = 100 * fidelity.assignment_fidelity
     separation = 100 * fidelity.separation
-    print(
+    log.info(
         f"readout fidelity {ipname}: assignment 1-(ε0+ε1)/2 = {assignment:.2f}% | "
         f"separation 1-ε0-ε1 = {separation:.2f}% | "
         f"ε0=P(1|0)={100 * fidelity.eps_0:.2f}% ε1=P(0|1)={100 * fidelity.eps_1:.2f}% | "
         f"threshold {fidelity.threshold:.3e} (rotated axis) | shots {fidelity.n_0}/{fidelity.n_1}"
     )
+
+    if not plot:
+        return CdfResult(None, fidelity)
 
     fig, (ax_scatter, ax_cdf) = plt.subplots(1, 2, figsize=(10, 5))
 
@@ -310,7 +360,8 @@ def _plot_rotated_cdf(
     ax_cdf.grid(True)
 
     fig.suptitle(ipname)
-    plt.tight_layout()
-    plt.show()
+    fig.tight_layout()
+    if show:
+        show_figures(block)
 
-    return fig, fidelity
+    return CdfResult(fig, fidelity)

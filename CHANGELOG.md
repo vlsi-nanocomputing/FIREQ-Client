@@ -7,6 +7,34 @@ tag names follow the `version-<major>.<minor>.<patch>` scheme.
 
 ## [Unreleased]
 
+### Added
+
+- **Scriptable client.** `FIREQ_CLIENT.FireqClient` connects (`connect`/`close`/`reconnect`, context
+  manager), sends commands that return values or raise, and runs experiments from a YAML path or a
+  dict, with `preprocess`/`variables` overrides, into an `ExperimentResult` (`run`) or point by point
+  (`run_iter`). Configurations are validated before being sent. Timeouts, `Ctrl-C` and a single
+  exception hierarchy (`FireqError`) make it usable from scripts. See `docs/usage/scripting.md`.
+- **Scriptable plotter.** `FIREQ_PLOTTER.plot_2d`, `plot_3d_heatmap`, `plot_iq` and `rotated_cdf`
+  accept directories, results or DataFrames, preset the selectors and sliders, and can skip
+  `plt.show()` (`show=False`) or the widgets (`interactive=False`).
+- Client prompt: `run_yaml <file> name=value ...` overrides, `last`, `reconnect`, `plot_2d`/`plot_3d_heat`/`plot_iq`
+  on the last run; command line options (`--host`, `--port`, `--token-env`, `--output-dir`,
+  `--log-level`, `--script`). `fireq-client` and `fireq-plotter` commands.
+- `examples/` with scripting examples.
+
+### Changed
+
+- The plotter shows all the figures of a command together; the readout fidelity is computed right
+  away (in its own figure) instead of after closing the IQ figure, and is logged instead of printed.
+- `pip install .` installs the library only; `.[all]` adds the prompts and the plotter. Python 3.11+.
+- `export` skips the points an aborted run has no data for.
+- The `FIREQ_PLOTTER.plotter` module is now `FIREQ_PLOTTER.cli`, `FIREQ_CLIENT.prompt_completer`
+  is now `FIREQ_CLIENT.cli.completer`.
+
+### Deprecated
+
+- `FIREQ_CLIENT.client.Client` and `Client.start()`: use `FireqClient` and `start_interactive()`.
+
 ## [0.1.1] - 2026-10-23
 
 Requires FIREQ-Server `v0.1.1`.

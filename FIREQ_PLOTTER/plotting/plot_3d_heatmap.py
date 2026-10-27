@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,9 +19,11 @@ from .common import (
     SliderPanel,
     add_selector_window,
     average_over_level,
+    check_choice,
     common_variable_axes,
     drop_constant_levels,
     figure_is_open,
+    finish_plot,
     slice_dataframe,
     union_index_values,
 )
@@ -45,6 +47,15 @@ def _plot_3d_heatmap(
     ipname: str = "default",
     dataset_names: Sequence[str] | None = None,
     average_over: str | None = "shot",
+    *,
+    quantity: str | None = None,
+    x: str | None = None,
+    y: str | None = None,
+    dataset: int = 0,
+    selection: Mapping[str, float] | None = None,
+    interactive: bool = True,
+    show: bool = True,
+    block: bool | None = None,
 ) -> PlotHandles:
     """Interactively plot the experiment data as a heatmap.
 
@@ -62,8 +73,25 @@ def _plot_3d_heatmap(
     :param average_over: average the values of this index level, usually
         "shot". Ignored when the level is absent.
     :type average_over: str | None
-    :raises ValueError: if there is no dataframe or fewer than two swept
-        variables.
+    :param quantity: quantity to plot, one of ``HEATMAP_QUANTITY_KEYS``.
+    :type quantity: str | None
+    :param x: variable on the x axis, the innermost one by default.
+    :type x: str | None
+    :param y: variable on the y axis, the second innermost one by default.
+    :type y: str | None
+    :param dataset: index of the dataframe displayed first.
+    :type dataset: int
+    :param selection: value of the other swept variables (the slider positions).
+    :type selection: Mapping[str, float] | None
+    :param interactive: draw the selectors and the sliders; when False the
+        figure is static.
+    :type interactive: bool
+    :param show: show the figure.
+    :type show: bool
+    :param block: forwarded to ``plt.show``.
+    :type block: bool | None
+    :raises ValueError: if there is no dataframe, fewer than two swept
+        variables, or a preset is not one of the options.
     :return: the handles of the plot.
     :rtype: PlotHandles
     """
@@ -83,13 +111,22 @@ def _plot_3d_heatmap(
     quantity_keys = list(HEATMAP_QUANTITY_KEYS)
     label_to_key = {QUANTITY_SPECS[key].label: key for key in quantity_keys}
     axis_labels = list(var_axes)
+    check_choice("quantity", quantity, quantity_keys)
+    check_choice("x axis", x, var_axes)
+    check_choice("y axis", y, var_axes)
+    if not 0 <= dataset < len(plot_dfs):
+        raise ValueError(f"Invalid dataset {dataset}, there are {len(plot_dfs)}")
+    x_axis = x or (var_axes[-1] if y != var_axes[-1] else var_axes[-2])
+    y_axis = y or next(var for var in reversed(var_axes) if var != x_axis)
+    if x_axis == y_axis:
+        raise ValueError(f"The x and y axes must differ, both are {x_axis!r}")
 
     # the state every callback reads and writes
     state = {
-        "quantity": quantity_keys[0],
-        "x_axis": var_axes[-1],
-        "y_axis": var_axes[-2],
-        "dataset": 0,
+        "quantity": quantity or quantity_keys[0],
+        "x_axis": x_axis,
+        "y_axis": y_axis,
+        "dataset": dataset,
         "syncing": False,
     }
 
@@ -219,7 +256,7 @@ def _plot_3d_heatmap(
         state["dataset"] = names.index(label)
         update()
 
-    panel = SliderPanel(fig, update, on_layout_change=layout)
+    panel = SliderPanel(fig, update, on_layout_change=layout, initial=selection, interactive=interactive)
 
     specs = [
         SelectorSpec(
@@ -233,9 +270,10 @@ def _plot_3d_heatmap(
     ]
     if len(plot_dfs) > 1:
         specs.append(SelectorSpec(DATASET_RADIO_TITLE, names, state["dataset"], on_dataset))
-    control_fig, radios = add_selector_window(specs, fig, title=f"{ipname} controls")
+    control_fig, radios = None, {}
+    if interactive:
+        control_fig, radios = add_selector_window(specs, fig, title=f"{ipname} controls")
 
     panel.rebuild([var for var in var_axes if var not in (state["x_axis"], state["y_axis"])], var_values)
 
-    plt.show()
-    return PlotHandles(fig, ax, radios, panel, control_fig)
+    return finish_plot(PlotHandles(fig, ax, radios, panel, control_fig), show, block)

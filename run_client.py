@@ -1,62 +1,8 @@
-"""Entry point for the FIREQ client.
+"""Entry point for the FIREQ client (same as the ``fireq-client`` command)."""
 
-This script starts the client and asks the user to which IP:PORT it should connect.
-"""
-
-import logging
-import os
 import sys
 
-from FIREQ_CLIENT.client import DEFAULT_OUTPUT_DIR, Client
-
-
-def setup_logging(level: int) -> logging.Logger:
-    """Configure logging for the client."""
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-    return logging.getLogger(__name__)
-
-
-def main() -> None:
-    """Prompt for the server address, token and output directory, then start the client."""
-    logger = setup_logging(level=logging.INFO)
-    logger.info("### FIREQ Client startup ###\n")
-
-    # set logging level
-    log_level = input("Input logging level: 'debug', 'info' (press enter for 'info')\n").strip().lower()
-    if log_level == "debug":
-        logging.getLogger().setLevel(logging.DEBUG)
-    elif log_level not in ("", "info"):
-        logger.warning(f"Unknown logging level '{log_level}', using 'info'")
-
-    # Get server configuration
-    server_ip = input('# Insert server IP (press Enter for "0.0.0.0")\n').strip()
-    if not server_ip:
-        server_ip = "0.0.0.0"
-
-    server_port = input('# Insert server port (press Enter for "5000")\n').strip()
-    if not server_port:
-        server_port = 5000
-    else:
-        try:
-            server_port = int(server_port)
-        except ValueError:
-            logger.error(f"Invalid port number: {server_port}")
-            sys.exit(-1)
-
-    auth_token = input('# Insert auth token (press Enter for "fireq")\n').strip()
-    if not auth_token:
-        auth_token = "fireq"
-
-    output_dir = input(f'# Insert the output directory (press Enter for "{DEFAULT_OUTPUT_DIR}")\n').strip()
-    output_dir = os.path.expanduser(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
-
-    # run the client
-    client = Client(server_ip, server_port, auth_token=auth_token, output_dir=output_dir)
-    client.start()
-
+from FIREQ_CLIENT.cli import main
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from FIREQ_CLIENT.client import Client
+from FIREQ_CLIENT import ConfigurationError, ConnectionLost, FireqClient, load_config
 from FIREQ_CLIENT.network import Message, ReceiveWorker, SendWorker
 from FIREQ_CLIENT.yaml_preprocessor import load_and_resolve
 
@@ -82,35 +82,35 @@ def test_sender_flags_send_error(pair):
 
 def test_wait_for_message_raises_on_lost_connection(pair):
     a, b = pair
-    client = Client("localhost", 0)
+    client = FireqClient("localhost", 0)
     client.reader = ReceiveWorker(b)
     client.sender = SendWorker(b)
     client.reader.start()
     a.close()
-    with pytest.raises(ConnectionError):
+    with pytest.raises(ConnectionLost):
         client._wait_for_message()
 
 
 def test_wait_for_message_serves_queued_messages_before_failing(pair):
     a, b = pair
-    client = Client("localhost", 0)
+    client = FireqClient("localhost", 0)
     client.reader = ReceiveWorker(b)
     client.reader.start()
     a.sendall(b"".join(Message(header={"msg": "last"}).to_buffers()))
     a.close()
     assert _wait(client.reader.failed.is_set)
     assert client._wait_for_message().header["msg"] == "last"
-    with pytest.raises(ConnectionError):
+    with pytest.raises(ConnectionLost):
         client._wait_for_message()
 
 
 def test_disconnect_without_connection():
-    Client("localhost", 0)._disconnect()
+    FireqClient("localhost", 0)._disconnect()
 
 
 def test_drain_queue(pair):
     _, b = pair
-    client = Client("localhost", 0)
+    client = FireqClient("localhost", 0)
     client.reader = ReceiveWorker(b)
     client.reader._queue.put(Message(header={"stale": True}))
     client._drain_queue()
@@ -120,19 +120,19 @@ def test_drain_queue(pair):
 def test_config_requires_sys_config(tmp_path):
     f = tmp_path / "no_sys.yaml"
     f.write_text("variables: {}\n")
-    with pytest.raises(ValueError, match="sys_config"):
-        Client._load_config(str(f))
+    with pytest.raises(ConfigurationError, match="sys_config"):
+        load_config(str(f))
     empty = tmp_path / "empty.yaml"
     empty.write_text("")
-    with pytest.raises(ValueError):
-        Client._load_config(str(empty))
+    with pytest.raises(ConfigurationError):
+        load_config(str(empty))
 
 
 def test_config_resolves_placeholders(tmp_path):
     f = tmp_path / "ok.yaml"
     f.write_text("preprocess: {a: 3}\nsys_config: {x: '%a'}\nvariables: {}\n")
     assert load_and_resolve(str(f))["sys_config"] == {"x": 3}
-    assert Client._load_config(str(f))["sys_config"] == {"x": 3}
+    assert load_config(str(f)).sys_config == {"x": 3}
 
 
 def test_disconnect_is_fast_and_not_reported_as_lost(pair):
@@ -140,7 +140,7 @@ def test_disconnect_is_fast_and_not_reported_as_lost(pair):
 
     a, b = pair
     b.settimeout(SOCKET_TIMEOUT)
-    client = Client("localhost", 0)
+    client = FireqClient("localhost", 0)
     client.sock = b
     client.reader, client.sender = ReceiveWorker(b), SendWorker(b)
     client.reader.start()
@@ -154,7 +154,7 @@ def test_disconnect_is_fast_and_not_reported_as_lost(pair):
 
 def test_handshake_sends_token_and_client_name(pair):
     _, b = pair
-    client = Client("localhost", 0, auth_token="secret", client_name="lab-pc")
+    client = FireqClient("localhost", 0, token="secret", client_name="lab-pc")
     client.reader, client.sender = ReceiveWorker(b), SendWorker(b)
     client.reader._queue.put(Message(header={"type": "handshake"}))
     client._do_handshake()
@@ -165,7 +165,7 @@ def test_handshake_sends_token_and_client_name(pair):
 def test_workers_use_the_client_logger(monkeypatch):
     a, b = socket.socketpair()
     monkeypatch.setattr(socket, "create_connection", lambda *args, **kwargs: a)
-    client = Client("localhost", 0)
+    client = FireqClient("localhost", 0)
     client._connect()
     try:
         assert client.reader.log.name == "FIREQ_CLIENT.client.reader"

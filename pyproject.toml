@@ -10,20 +10,33 @@ build-backend = "setuptools.build_meta"
 # Project metadata (used by packaging/build tools and some IDEs)
 name = "fireq-client"
 version = "0.1.1"
-requires-python = ">=3.10"
+# the pinned pandas needs Python 3.11
+requires-python = ">=3.11"
 
-# Runtime dependencies, aligned with requirements.txt
+# Library core only: `pip install fireq-client[all]` adds the interactive prompts and the plotter.
+# requirements.txt keeps everything, for the lab installs.
 dependencies = [
-  "matplotlib==3.11.0",
   "msgpack==1.2.1",
   "numpy==1.26.4",
   "pandas==3.0.3",
-  "prompt_toolkit==3.0.52",
   "PyYAML==6.0.3",
-  "tqdm==4.67.3",
 ]
 
+[project.scripts]
+fireq-client = "FIREQ_CLIENT.cli:main"
+fireq-plotter = "FIREQ_PLOTTER.cli:main"
+
 [project.optional-dependencies]
+interactive = [
+  "prompt_toolkit==3.0.52",
+  "tqdm==4.67.3",
+]
+plot = [
+  "matplotlib==3.11.0",
+]
+all = [
+  "fireq-client[interactive,plot]",
+]
 # Development tools
 dev = [
   "black>=25.12.0",
@@ -31,11 +44,14 @@ dev = [
   "ruff>=0.14.11",
 ]
 
+[tool.setuptools.packages.find]
+include = ["FIREQ_CLIENT*", "FIREQ_PLOTTER*"]
+
 [tool.black]
 # Black is used for Python formatting.
 # It reformats code deterministically (no warnings, only formatting).
 line-length = 120
-target-version = ["py310"]
+target-version = ["py311"]
 
 [tool.ruff]
 # Ruff is used only as a linter (static analysis), not as a formatter.
