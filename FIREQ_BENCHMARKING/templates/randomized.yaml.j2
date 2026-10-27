@@ -1,0 +1,110 @@
+# Single-qubit randomized benchmarking experiment
+
+preprocess:
+  drive_modulation_frequency: {{ drive_modulation_frequency }}
+  readout_modulation_frequency: {{ readout_modulation_frequency }}
+  readout_duration: {{ readout_duration }}
+  gain_r: {{ gain_r }}
+  tof: {{ tof }}
+  drive_duration: {{ drive_duration }}
+  gain_pi: {{ gain_pi }}
+  gain_pi_half: {{ gain_pi / 2 }}
+
+variables: {}
+
+sys_config:
+  $shots: {{ shots | default(1000) }}
+
+  /axisGeneratorIP_{{ axis_generator_index | default(0) }}:
+    $dfrequency: "%drive_modulation_frequency"
+    $rfrequency: "%readout_modulation_frequency"
+    $rphase: 0.0
+    $rchannel: {{ readout_channel | default(1) }}
+    $dchannel: {{ drive_channel | default(1) }}
+
+    pulse:
+      - _name: x90
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: {{ drive_dac_target | default(1) }}
+        $duration: "%drive_duration"
+        $gain: "%gain_pi_half"
+
+      - _name: xm90
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: {{ drive_dac_target | default(1) }}
+        $duration: "%drive_duration"
+        $gain: -{{ gain_pi / 2 }}
+
+      - _name: y90
+        _readout: false
+        _envelope: _RECTANGULAR
+        _switch_iq: true
+        _dac_target: {{ drive_dac_target | default(1) }}
+        $duration: "%drive_duration"
+        $gain: "%gain_pi_half"
+
+      - _name: ym90
+        _readout: false
+        _envelope: _RECTANGULAR
+        _switch_iq: true
+        _dac_target: {{ drive_dac_target | default(1) }}
+        $duration: "%drive_duration"
+        $gain: -{{ gain_pi / 2 }}
+
+      - _name: x180
+        _readout: false
+        _envelope: _RECTANGULAR
+        _dac_target: {{ drive_dac_target | default(1) }}
+        $duration: "%drive_duration"
+        $gain: "%gain_pi"
+
+      - _name: y180
+        _readout: false
+        _envelope: _RECTANGULAR
+        _switch_iq: true
+        _dac_target: {{ drive_dac_target | default(1) }}
+        $duration: "%drive_duration"
+        $gain: "%gain_pi"
+
+      - _name: rect_r
+        _readout: true
+        _envelope: _RECTANGULAR
+        _dac_target: {{ readout_dac_target | default(1) }}
+        $duration: "%readout_duration"
+        $gain: "%gain_r"
+
+    $drive_order: {{ drive_order }}
+
+  /axisAcquisitionIP_{{ axis_acquisition_index | default(0) }}:
+    $duration: "%readout_duration"
+    $output_type: accumulated
+    $rfrequency: "%readout_modulation_frequency"
+    $rphase: 0.0
+    $rchannel: {{ readout_channel | default(1) }}
+    $tof: "%tof"
+
+  /axisTriggerGenerator_{{ axis_trigger_index | default(0) }}:
+    $experiment_duration: {{ experiment_duration }}
+
+    delay:
+{% if drive_order %}
+      - _name: drive_delay_0
+        _ttype: drive
+        _channel_mask: {{ drive_channel_mask | default(1) }}
+        _index: 1
+        $delay: {{ drive_delay | default(100) }}
+
+      - _name: readout_delay_0
+        _ttype: readout
+        _channel_mask: {{ readout_channel_mask | default(1) }}
+        _index: 2
+        $delay: {{ readout_delay }}
+{% else %}
+      - _name: readout_delay_0
+        _ttype: readout
+        _channel_mask: {{ readout_channel_mask | default(1) }}
+        _index: 1
+        $delay: {{ readout_delay }}
+{% endif %}
