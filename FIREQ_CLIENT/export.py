@@ -1,13 +1,13 @@
 """Export of experiment data."""
 
-import json
+import itertools
 import os
 import shutil
 from pathlib import Path
 
 import numpy as np
-
-from .data import load_dataframe, load_dataframe_raw
+import pandas as pd
+import yaml
 
 
 def export(from_dir: Path, to_dir: Path) -> None:
@@ -39,40 +39,55 @@ def export_experiment(from_dir: Path, to_dir: Path) -> None:
     print(f"exporting {from_dir}   to   {to_dir} ......")
     os.makedirs(to_dir, exist_ok=True)
 
-    # Load experiment configuration
+    # Load experiment summary
     try:
-        with open(from_dir / "config.json") as f:
-            config = json.load(f)
+        with open(from_dir / "experiment_summary.yaml") as f:
+            experiment_summary = yaml.unsafe_load(f)
     except FileNotFoundError:
         # no config = no experiment
         return
 
-    # Load the variable order
-    var_order = None
-    try:
-        with open(from_dir / "var_order.json") as f:
-            var_order = json.load(f)
-    except FileNotFoundError:
-        pass
+    var_order = experiment_summary.get("var_order")
+    var_values = experiment_summary.get("var_values")
 
-    if var_order is not None:
-        var_names = [var_order[str(i)] for i in range(len(var_order))]
-        var_values = {
-            name: np.linspace(
-                config["variables"][name]["start"],
-                config["variables"][name]["stop"],
-                config["variables"][name]["num"],
-            )
-            for name in var_names
-        }
-        df = load_dataframe(var_names, var_values, from_dir)
-    else:
-        df = load_dataframe_raw(from_dir)
+    for source_dir in from_dir.iterdir():
+        if source_dir.is_dir():
+            df = load_dataframe(var_order, var_values, source_dir)
+            # save the entire dataframe, plus the config and end_message.json
+            df.to_pickle(to_dir / f"data_{source_dir.name}.pkl")
+            df.to_csv(to_dir / f"data_{source_dir.name}.csv")
 
-    # save the entire dataframe, plus the config and end_message.json
-    df.to_pickle(to_dir / "data.pkl")
-    shutil.copy(from_dir / "config.json", to_dir / "config.json")
-    if os.path.exists(from_dir / "end_message.json"):
-        shutil.copy(from_dir / "end_message.json", to_dir / "end_message.json")
-    if os.path.exists(from_dir / "a_figure.png"):
-        shutil.copy(from_dir / "a_figure.png", to_dir / "a_figure.png")
+    shutil.copy(from_dir / "experiment_summary.yaml", to_dir / "experiment_summary.yaml")
+
+
+def load_dataframe(var_order: list[str], var_values: dict[str, np.ndarray], source_dir: Path) -> pd.DataFrame:
+    """
+    Load a dataframe from source_dir.
+
+    The dataframe is the combination of all pieces found within the folder, which are named
+    as data_x_y_..._z, where x,y,...,z are the variable indices and the variable names are defined
+    by the var_order, where x is the first (outer loop) and z is the last (innermost loop)
+
+    :param var_order: Order of variable names from outer to inner (left to right for the file names)
+    :type var_order: list[str]
+    :param var_values: Dictionary mapping variable name with its values
+    :type var_values: dict[str, np.ndarray]
+    :param source_dir: Directory where all data pieces are stored
+    :type source_dir: Path
+    :return: Whole dataframe as the combination of all pieces
+    :rtype: DataFrame
+    """
+    # iterate over all variable combinations
+    configs = []
+    frames = []
+    for point in itertools.product(*[range(len(var_values[v])) for v in var_order]):
+        frame_name = f"data_{'_'.join(map(str, point))}"
+        frame_df = pd.read_pickle(f"{source_dir}/{frame_name}.pkl")
+
+        # Get the current var values, index from the checkpoint into the var values
+        config = tuple(var_values[var][idx] for var, idx in zip(var_order, point, strict=True))
+        configs.append(config)
+        frames.append(frame_df)
+
+    # Now build the complete DataFrame and return it
+    return pd.concat(frames, keys=configs, names=var_order)

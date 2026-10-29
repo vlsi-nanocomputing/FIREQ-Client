@@ -39,13 +39,14 @@ firmware repositories.
 ```text
 FIREQ-Client/
 ├── FIREQ_CLIENT/                                    Python client package
-├── FIREQ_PLOTTER/                                   Plotting utilities and REPL
+├── FIREQ_PLOTTER/                                   Interactive plotting package and REPL
 ├── yaml_experiment_configurations_examples/         Example experiment YAML configurations
 ├── testing/                                         Test scripts
 ├── docs/                                            Client-specific documentation
 ├── run_client.py                                    Minimal client entry point
 ├── run_plotter.py                                   Plotter entry point
 ├── requirements.txt                                 Python dependencies
+├── CHANGELOG.md                                     Release history
 └── README.md
 ```
 

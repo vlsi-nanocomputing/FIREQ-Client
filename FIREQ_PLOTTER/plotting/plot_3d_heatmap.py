@@ -1,180 +1,241 @@
 """Interactive 3D heatmap of the experiment data."""
 
-import json
-from pathlib import Path
+from __future__ import annotations
+
+from collections.abc import Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
-from .common import TIME_MULTIPLIER, add_sliders, get_var_names, load_exported_dataframe
+from .common import (
+    LAYOUT_BASE_BOTTOM,
+    LAYOUT_STRIDE,
+    PLOT_STYLE,
+    QUANTITY_SPECS,
+    VALUE_COLUMN,
+    PlotHandles,
+    SelectorSpec,
+    SliderPanel,
+    add_selector_window,
+    average_over_level,
+    common_variable_axes,
+    drop_constant_levels,
+    figure_is_open,
+    slice_dataframe,
+    union_index_values,
+)
+
+QUANTITY_RADIO_TITLE: str = "quantity"
+X_AXIS_RADIO_TITLE: str = "x-axis"
+Y_AXIS_RADIO_TITLE: str = "y-axis"
+DATASET_RADIO_TITLE: str = "dataset"
+
+#: quantities the heatmap can display, each with its own colormap.
+HEATMAP_QUANTITY_KEYS: tuple[str, ...] = ("magnitude", "phase", "real", "imag")
+
+# layout constants, in figure fractions, for the colorbar axes
+COLORBAR_LEFT: float = 0.935
+COLORBAR_WIDTH: float = 0.02
+IMAGE_TOP: float = 0.92
 
 
 def _plot_3d_heatmap(
-    exp_dir: str,
-    plot_magnitude: bool = True,
-    plot_phase: bool = False,
-    plot_real: bool = False,
-    plot_imag: bool = False,
-    save: bool = False,
-) -> None:
-    """Interactive heatmap.
+    dataframes: Sequence[pd.DataFrame],
+    ipname: str = "default",
+    dataset_names: Sequence[str] | None = None,
+    average_over: str | None = "shot",
+) -> PlotHandles:
+    """Interactively plot the experiment data as a heatmap.
 
-    accumulated:
-        x = variable 0
-        y = variable 1
+    The figure holds a quantity selector, an x-axis selector, a y-axis
+    selector, one slider per remaining swept variable, and - when several
+    dataframes are given - a selector for the displayed dataframe.
 
-    raw/decimated:
-        x = time
-        y = variable 0
-
-    Remaining variables become sliders.
-
-    :param exp_dir: experiment directory.
-    :type exp_dir: str
-    :param plot_magnitude: plot the magnitude.
-    :type plot_magnitude: bool
-    :param plot_phase: plot the phase.
-    :type plot_phase: bool
-    :param plot_real: plot the real part.
-    :type plot_real: bool
-    :param plot_imag: plot the imaginary part.
-    :type plot_imag: bool
-    :param save: also save the figure as a_figure.png.
-    :type save: bool
+    :param dataframes: dataframes to plot, one is displayed at a time.
+    :type dataframes: Sequence[pd.DataFrame]
+    :param ipname: name of the acquisition IP, displayed as the title.
+    :type ipname: str
+    :param dataset_names: name of the experiment directory each dataframe
+        comes from, used by the dataframe selector.
+    :type dataset_names: Sequence[str] | None
+    :param average_over: average the values of this index level, usually
+        "shot". Ignored when the level is absent.
+    :type average_over: str | None
+    :raises ValueError: if there is no dataframe or fewer than two swept
+        variables.
+    :return: the handles of the plot.
+    :rtype: PlotHandles
     """
-    exp_path = Path(exp_dir)
+    if not dataframes:
+        raise ValueError("Need at least one dataframe to plot")
 
-    dataframe = load_exported_dataframe(exp_path)
-    if dataframe is None:
-        return
+    names = (
+        list(dataset_names) if dataset_names is not None else [f"dataset {index}" for index in range(len(dataframes))]
+    )
+    plot_dfs = [average_over_level(df, average_over) for df in dataframes]
 
-    with open(exp_path / "config.json") as f:
-        config = json.load(f)
+    var_axes = common_variable_axes(plot_dfs)
+    if len(var_axes) < 2:
+        raise ValueError("Not enough axes in data to plot a heatmap")
 
-    output_type = config["sys_config"]["/axisAcquisitionIP_0"]["$output_type"]
-    time_mult = TIME_MULTIPLIER.get(output_type, 1)
+    var_values = union_index_values(plot_dfs, var_axes)
+    quantity_keys = list(HEATMAP_QUANTITY_KEYS)
+    label_to_key = {QUANTITY_SPECS[key].label: key for key in quantity_keys}
+    axis_labels = list(var_axes)
 
-    var_names = get_var_names(dataframe)
-
-    if output_type in ("raw", "decimated"):
-        if not var_names:
-            print(f"No sweep variables in experiment {exp_path.name}; nothing to plot.")
-            return
-        x_name = "time"
-        y_name = var_names[0]
-        slider_vars = var_names[1:]
-    else:
-        if len(var_names) < 2:
-            print(f"Accumulated experiment {exp_path.name} needs at least two sweep variables.")
-            return
-        x_name = var_names[0]
-        y_name = var_names[1]
-        slider_vars = var_names[2:]
-
-    var_values = {
-        name: np.linspace(
-            config["variables"][name]["start"],
-            config["variables"][name]["stop"],
-            config["variables"][name]["num"],
-        )
-        for name in var_names
+    # the state every callback reads and writes
+    state = {
+        "quantity": quantity_keys[0],
+        "x_axis": var_axes[-1],
+        "y_axis": var_axes[-2],
+        "dataset": 0,
+        "syncing": False,
     }
 
-    mode = (
-        "magnitude"
-        if plot_magnitude
-        else "phase"
-        if plot_phase
-        else "real"
-        if plot_real
-        else "imag"
-    )
+    plt.style.use(PLOT_STYLE)
+    fig, ax = plt.subplots(figsize=(9, 6))
 
-    plt.style.use("seaborn-v0_8-darkgrid")
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    plt.subplots_adjust(bottom=0.08 * max(1, len(slider_vars) + 1))
-
+    # the colorbar gets its own axes, so that adjusting the subplot never
+    # overlaps it with the image
+    cax = fig.add_axes((COLORBAR_LEFT, 0.1, COLORBAR_WIDTH, 0.5))
     img = ax.imshow(
         np.zeros((2, 2)),
         origin="lower",
         aspect="auto",
         interpolation="nearest",
+        cmap=QUANTITY_SPECS[state["quantity"]].cmap,
     )
+    cbar = fig.colorbar(img, cax=cax)
+    cbar.set_label(QUANTITY_SPECS[state["quantity"]].label)
 
-    cbar = plt.colorbar(img, ax=ax)
-    cbar.set_label(mode)
-
-    def update(_: object = None) -> None:
-        """Redraw the heatmap with the current slider selections.
-
-        :param _: slider value (unused).
-        :type _: object
-        """
-        df = dataframe
-
-        for var in slider_vars:
-            idx = int(sliders[var].val)
-            df = df[df.index.get_level_values(var) == idx]
-
-        if df.empty:
+    def update() -> None:
+        """Redraw the heatmap for the selected quantity, axes and values."""
+        if not figure_is_open(fig):
             return
 
-        if output_type in ("raw", "decimated"):
-            heat = (
-                df["value"]
-                .unstack("time")
-                .reindex(range(len(var_values[y_name])))
-            )
+        spec = QUANTITY_SPECS[state["quantity"]]
+        x_axis = state["x_axis"]
+        y_axis = state["y_axis"]
 
-            x = heat.columns.to_numpy() * time_mult
-            y = var_values[y_name]
+        filtered = slice_dataframe(plot_dfs[state["dataset"]], panel.selection())
+        if filtered.empty:
+            return
+        heat_frame = drop_constant_levels(filtered, (y_axis, x_axis))
 
-        else:
-            heat = (
-                df["value"]
-                .droplevel("time")
-                .unstack(y_name)
-                .reindex(range(len(var_values[x_name])))
-            )
-
-            heat = heat.T
-
-            x = var_values[x_name]
-            y = var_values[y_name]
-
-        data = heat.to_numpy()
-
-        if mode == "magnitude":
-            data = np.abs(data)
-            cmap = "viridis"
-
-        elif mode == "phase":
-            data = np.angle(data)
-            cmap = "twilight"
-
-        elif mode == "real":
-            data = np.real(data)
-            cmap = "RdBu_r"
-
-        else:
-            data = np.imag(data)
-            cmap = "RdBu_r"
+        # the remaining index is exactly [y_axis, x_axis], unstack x into columns
+        heat = heat_frame[VALUE_COLUMN].unstack(x_axis).sort_index(axis=0).sort_index(axis=1)
+        x = heat.columns.to_numpy()
+        y = heat.index.to_numpy()
+        data = spec.transform(heat.to_numpy())
 
         img.set_data(data)
-        img.set_cmap(cmap)
         img.set_extent([x[0], x[-1], y[0], y[-1]])
 
-        img.set_clim(np.nanmin(data), np.nanmax(data))
+        finite = data[np.isfinite(data)]
+        if finite.size:
+            low, high = float(finite.min()), float(finite.max())
+            if high <= low:
+                # a constant slice has no colour range of its own
+                high = low + 1.0
+            img.set_clim(low, high)
 
-        ax.set_xlabel(x_name)
-        ax.set_ylabel(y_name)
-
+        ax.set_xlim(x[0], x[-1])
+        ax.set_ylim(y[0], y[-1])
+        ax.set_xlabel(x_axis)
+        ax.set_ylabel(y_axis)
+        ax.set_title(ipname if len(plot_dfs) == 1 else f"{ipname} — {names[state['dataset']]}")
         fig.canvas.draw_idle()
 
-    sliders = add_sliders(slider_vars, var_values, update)
+    def layout(slider_count: int) -> None:
+        """Reserve room for the sliders and keep the colorbar beside the image.
 
-    update()
-    if save:
-        plt.savefig(exp_path / "a_figure.png")
+        :param slider_count: number of sliders currently displayed.
+        :type slider_count: int
+        """
+        bottom = LAYOUT_BASE_BOTTOM + LAYOUT_STRIDE * slider_count
+        fig.subplots_adjust(left=0.08, right=0.92, top=IMAGE_TOP, bottom=bottom)
+        cax.set_position((COLORBAR_LEFT, bottom, COLORBAR_WIDTH, IMAGE_TOP - bottom))
+
+    def select_axis(which: str, label: str) -> None:
+        """Send a variable to one axis, swapping it with the other axis.
+
+        :param which: the axis to change, "x_axis" or "y_axis".
+        :type which: str
+        :param label: name of the selected variable.
+        :type label: str
+        """
+        if state["syncing"]:
+            return
+
+        other = "y_axis" if which == "x_axis" else "x_axis"
+        previous = state[which]
+        state[which] = label
+        if label == state[other]:
+            # the same variable was picked twice, the two axes swap
+            state["syncing"] = True
+            state[other] = previous
+            other_title = Y_AXIS_RADIO_TITLE if other == "y_axis" else X_AXIS_RADIO_TITLE
+            radios[other_title].set_active(axis_labels.index(previous))
+            state["syncing"] = False
+
+        panel.rebuild([var for var in var_axes if var not in (state["x_axis"], state["y_axis"])], var_values)
+
+    def on_quantity(label: str) -> None:
+        """Switch the plotted quantity.
+
+        :param label: label of the selected quantity.
+        :type label: str
+        """
+        key = label_to_key[label]
+        state["quantity"] = key
+        spec = QUANTITY_SPECS[key]
+        img.set_cmap(spec.cmap)
+        cbar.set_label(spec.label)
+        update()
+
+    def on_x_axis(label: str) -> None:
+        """Move a variable to the x axis.
+
+        :param label: name of the selected variable.
+        :type label: str
+        """
+        select_axis("x_axis", label)
+
+    def on_y_axis(label: str) -> None:
+        """Move a variable to the y axis.
+
+        :param label: name of the selected variable.
+        :type label: str
+        """
+        select_axis("y_axis", label)
+
+    def on_dataset(label: str) -> None:
+        """Switch the displayed dataframe.
+
+        :param label: name of the selected experiment directory.
+        :type label: str
+        """
+        state["dataset"] = names.index(label)
+        update()
+
+    panel = SliderPanel(fig, update, on_layout_change=layout)
+
+    specs = [
+        SelectorSpec(
+            QUANTITY_RADIO_TITLE,
+            [QUANTITY_SPECS[key].label for key in quantity_keys],
+            quantity_keys.index(state["quantity"]),
+            on_quantity,
+        ),
+        SelectorSpec(X_AXIS_RADIO_TITLE, axis_labels, axis_labels.index(state["x_axis"]), on_x_axis),
+        SelectorSpec(Y_AXIS_RADIO_TITLE, axis_labels, axis_labels.index(state["y_axis"]), on_y_axis),
+    ]
+    if len(plot_dfs) > 1:
+        specs.append(SelectorSpec(DATASET_RADIO_TITLE, names, state["dataset"], on_dataset))
+    control_fig, radios = add_selector_window(specs, fig, title=f"{ipname} controls")
+
+    panel.rebuild([var for var in var_axes if var not in (state["x_axis"], state["y_axis"])], var_values)
+
     plt.show()
+    return PlotHandles(fig, ax, radios, panel, control_fig)

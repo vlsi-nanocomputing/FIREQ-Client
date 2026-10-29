@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 [project]
 # Project metadata (used by packaging/build tools and some IDEs)
 name = "fireq-client"
-version = "0.1.0"
+version = "0.1.1"
 requires-python = ">=3.10"
 
 # Runtime dependencies, aligned with requirements.txt
@@ -27,6 +27,7 @@ dependencies = [
 # Development tools
 dev = [
   "black>=25.12.0",
+  "pytest>=8.0",
   "ruff>=0.14.11",
 ]
 
@@ -68,6 +69,9 @@ ignore = [
     "PLR2004",
 ]
 future-annotations = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "ANN", "PLC0415", "SLF"]
 
 [tool.ruff.format]
 docstring-code-format = true
