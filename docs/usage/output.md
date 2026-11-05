@@ -3,32 +3,65 @@
 Each experiment run creates a timestamped output directory under:
 
 ```text
-experiment_output/<experiment_name>/experiment_<timestamp>/
+<output directory>/<experiment_name>/experiment_<timestamp>/
 ```
 
-The folder is created automatically if it does not exist. Inside it, the client stores the experiment under the experiment name and writes the files produced during acquisition.
+The output directory is asked at startup and defaults to `experiment_output`, relative to the
+directory the client is started from; the client logs its absolute path once connected.
 
-For a non-swept experiment, the output typically includes:
+The folder is created automatically, named after the moment the run starts. Inside it, the
+client stores the experiment under the experiment name and writes the files produced during
+acquisition.
 
-- `config.json`: the full configuration used for the run,
-- `data.pkl`: the main data output,
-- `end_message.json`: summary information reported by the server.
+Every run writes:
 
-For swept experiments, the client writes one pickle data file per sweep step (for
-example, `data_0.pkl`), a per-step status file (for example, `exp_0.json`),
-`configuration.json`, `var_order.json`, and `end_message.json`. The swept
-experiment also contains the initial `config.json` created for the experiment.
+- `experiment_summary.yaml`: the experiment name, the configuration used for the run, and
+  the variable information — the sweep variables in `var_order` and their values in
+  `var_values`,
+- `runtimes.yaml`: the timing of the run, written when the experiment ends, as reported by
+  the server, in nanoseconds: `runtimes` holds the time of each iteration (one entry per
+  sweep point), `run_time` the total time of the run. `aborted` is `true` when the server
+  stopped the run early, in which case the data is partial,
+- one subdirectory per acquisition IP (`axisAcquisitionIP_0/`, `axisAcquisitionIP_1/`, …),
+  holding the data acquired by that IP.
 
-If the experiment contains a single sweep variable with 100 values, the output contains files such as:
+The data files inside an acquisition IP subdirectory are named after the index of each
+acquisition point in the sweep. For a non-swept experiment there is a single acquisition
+point per IP; for a swept experiment there is one file per sweep step, and the numbers in
+the file name are the indices of the sweep variables, in `var_order` order. A pickle holds
+the data, and the `.csv` next to it holds the same data in text form.
 
-- `data_0.pkl`, `exp_0.json`
+If the experiment contains a single sweep variable with 100 values, the output contains
+files such as:
+
+- `data_0.pkl`, `data_0.csv`
 - ...
-- `data_99.pkl`, `exp_99.json`
+- `data_99.pkl`, `data_99.csv`
 
-If the experiment contains two sweep variables, such as gain and frequency, the output uses a two-index naming convention such as:
+If the experiment contains two sweep variables, such as gain and frequency, the output
+uses a two-index naming convention such as:
 
-- `data_0_0.pkl`, `exp_0_0.json`
+- `data_0_0.pkl`, `data_0_0.csv`
 - ...
-- `data_99_99.pkl`, `exp_99_99.json`
+- `data_99_99.pkl`, `data_99_99.csv`
 
-The numbering reflects the sweep index associated with each variable. The file `var_order.json` records the order of the sweep variables so that each index can be mapped back to the corresponding parameter.
+The complete layout of an experiment swept over one variable looks like:
+
+```text
+experiment_output/drive_loopback/experiment_20260914_161330/
+├── axisAcquisitionIP_0/
+│   ├── data_0.pkl
+│   ├── data_0.csv
+│   ├── ...
+├── axisAcquisitionIP_1/
+│   ├── data_0.pkl
+│   ├── data_0.csv
+│   └── ...
+├── experiment_summary.yaml
+└── runtimes.yaml
+```
+
+The numbering reflects the sweep index associated with each variable. Together with the
+`var_order` recorded in `experiment_summary.yaml`, each index maps back to the
+corresponding parameter. To plot an experiment, export it first: the `export` command
+combines the per-sweep-point files into one dataframe per acquisition IP.

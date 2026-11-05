@@ -4,13 +4,14 @@ This script starts the client and asks the user to which IP:PORT it should conne
 """
 
 import logging
+import os
 import sys
 
-from FIREQ_CLIENT.client import Client
+from FIREQ_CLIENT.client import DEFAULT_OUTPUT_DIR, Client
 
 
 def setup_logging(level: int) -> logging.Logger:
-    """Configure logging for the server."""
+    """Configure logging for the client."""
     logging.basicConfig(
         level=level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -19,16 +20,16 @@ def setup_logging(level: int) -> logging.Logger:
 
 
 def main() -> None:
-    """Prompt for IP and PORT of the server and start the client."""
+    """Prompt for the server address, token and output directory, then start the client."""
     logger = setup_logging(level=logging.INFO)
     logger.info("### FIREQ Client startup ###\n")
 
     # set logging level
-    log_level = input("Input logging level: 'debug', 'info' (press enter for 'info')\n")
+    log_level = input("Input logging level: 'debug', 'info' (press enter for 'info')\n").strip().lower()
     if log_level == "debug":
         logging.getLogger().setLevel(logging.DEBUG)
-    else:
-        pass
+    elif log_level not in ("", "info"):
+        logger.warning(f"Unknown logging level '{log_level}', using 'info'")
 
     # Get server configuration
     server_ip = input('# Insert server IP (press Enter for "0.0.0.0")\n').strip()
@@ -49,9 +50,12 @@ def main() -> None:
     if not auth_token:
         auth_token = "fireq"
 
-    # run the server
-    client = Client(server_ip, server_port)
-    client.run()
+    output_dir = input(f'# Insert the output directory (press Enter for "{DEFAULT_OUTPUT_DIR}")\n').strip()
+    output_dir = os.path.expanduser(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
+
+    # run the client
+    client = Client(server_ip, server_port, auth_token=auth_token, output_dir=output_dir)
+    client.start()
 
 
 if __name__ == "__main__":

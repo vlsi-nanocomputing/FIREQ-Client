@@ -20,7 +20,14 @@ On Windows PowerShell, the activation command is:
 
 ## Running the client
 
-Before launching the client, make sure you know the board's server address and port. `run_client.py` prompts for both values at startup; pressing Enter uses `0.0.0.0` and `5000` as the defaults.
+Before launching the client, make sure you know the board's server address and port. `run_client.py` asks at startup, in order, for:
+
+- the logging level (`debug` or `info`, default `info`),
+- the server IP and port (defaults `0.0.0.0` and `5000`),
+- the authentication token sent in the handshake (default `fireq`, it must match the server's),
+- the output directory for the experiment data (default `experiment_output`, relative to the directory the client is started from; `~` is expanded).
+
+Pressing Enter takes the default.
 
 Now, the client can be started with:
 

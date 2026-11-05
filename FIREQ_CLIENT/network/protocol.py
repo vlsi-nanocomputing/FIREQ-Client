@@ -9,12 +9,12 @@ import msgpack
 
 @dataclass
 class Message:
-    """Simple message type, will be sent over the socket as a json.
+    """Simple message type, sent over the socket as a msgpack header plus optional binary data.
 
-    :param type: Message type identifier ("experiment_header" or "sweep_header").
-    :type type: str
-    :param metadata: Full metadata dict to serialize as JSON.
-    :type metadata: dict
+    :param header: header dict, serialized with msgpack.
+    :type header: dict
+    :param data: optional trailing binary payload; its size is added to the header as ``tsize``.
+    :type data: bytes
     """
 
     header: dict

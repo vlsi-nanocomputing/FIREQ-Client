@@ -27,12 +27,21 @@ class CommandCompleter(Completer):
         # in argument position. Note: commands are matched case-sensitively, exactly
         # like _dispatch_command.
         self.argument_specs = {
+            "config_yaml": [self.yaml_completer],
             "run_yaml": [self.yaml_completer],
             "export": [self.dir_completer, self.dir_completer],
         }
         commands = [
-            'ping', 'run_yaml', 'reset_all', 'mts_sync', 'set_nyquist',
-            'trigger_manually', 'export', 'quit', 'exit',
+            "ping",
+            "config_yaml",
+            "run_yaml",
+            "reset_all",
+            "mts_sync",
+            "set_nyquist",
+            "trigger_manually",
+            "export",
+            "quit",
+            "exit",
         ]
         self.command_completer = WordCompleter(commands)
 

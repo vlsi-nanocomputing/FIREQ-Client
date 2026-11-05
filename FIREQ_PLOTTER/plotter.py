@@ -1,8 +1,11 @@
 """Interactive plotter for FIREQ experiment data."""
 
+from __future__ import annotations
+
 import os
 import shlex
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
+from pathlib import Path
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -10,7 +13,15 @@ from prompt_toolkit.completion import CompleteEvent, Completer, Completion, Path
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory
 
-from .plotting import _plot_2d, _plot_3d_heatmap, _plot_iq, _plot_spectr
+from .plotting import _plot_2d, _plot_3d_heatmap, _plot_iq_curve
+from .plotting.common import load_and_plot
+
+#: the plotting commands of the REPL, mapped to the function that runs them.
+PLOT_COMMANDS: dict[str, Callable[..., object]] = {
+    "plot_2d": _plot_2d,
+    "plot_3d_heat": _plot_3d_heatmap,
+    "plot_iq_curve": _plot_iq_curve,
+}
 
 
 class CommandCompleter(Completer):
@@ -18,22 +29,10 @@ class CommandCompleter(Completer):
 
     def __init__(self) -> None:
         """Initialize the completers for commands and their arguments."""
-        # ── basic completers you can reuse ──────────────────
-        self.file_completer = PathCompleter(expanduser=True)
         self.dir_completer = PathCompleter(expanduser=True, only_directories=True)
-        # example: a simple options completer
-        self.plot_2d_opt_completer = WordCompleter(["", "ri", "r", "i"], ignore_case=True)
-        self.plot_3dheat_opt_completer = WordCompleter(["", "p", "r", "i"], ignore_case=True)
-        self.save_completer = WordCompleter(["", "save"], ignore_case=True)
 
-        # ── define what arguments each command expects ──────
-        self.argument_specs = {
-            "plot_2d": [self.dir_completer, self.plot_2d_opt_completer, self.save_completer],
-            "plot_3d_heat": [self.dir_completer, self.plot_3dheat_opt_completer, self.save_completer],
-            "plot_iq": [self.dir_completer, self.dir_completer, self.save_completer],
-            "plot_spectr": [self.dir_completer, self.dir_completer, self.save_completer],
-            # add more commands as needed
-        }
+        # every plotting command takes a series of experiment directories
+        self.argument_specs = {command: [self.dir_completer] for command in PLOT_COMMANDS}
         commands = [*self.argument_specs, "quit", "exit"]
         self.command_completer = WordCompleter(
             commands,
@@ -77,100 +76,92 @@ class CommandCompleter(Completer):
         if not spec:
             return
 
-        # Make sure we don't go out of range (use the last completer if too many args)
-        if arg_index >= len(spec):
-            completer = spec[-1]
-        else:
-            completer = spec[arg_index]
+        # The arguments are a series of directories, the completer is the
+        # same for every argument position.
+        completer = spec[-1] if arg_index >= len(spec) else spec[arg_index]
 
         # feed to the completer the string up to the last whitespace
         idx = text_before.rfind(" ")
         current_text = text_before[idx + 1 :]
 
-        # Create a micro‑document for the isolated argument
+        # Create a micro-document for the isolated argument
         arg_doc = Document(current_text, len(current_text))
 
         # Delegate to the appropriate completer
         yield from completer.get_completions(arg_doc, complete_event)
 
 
+def parse_experiment_dirs(tokens: Sequence[str]) -> list[Path]:
+    """Return the experiment directories given on the command line.
+
+    :param tokens: the command line arguments, following the command name.
+    :type tokens: Sequence[str]
+    :raises ValueError: if no directory is given, or one of the tokens does
+        not point at a directory.
+    :return: the experiment directories.
+    :rtype: list[Path]
+    """
+    if not tokens:
+        raise ValueError("usage: <command> <experiment_dir> [<experiment_dir> ...]")
+
+    exp_dirs = []
+    for token in tokens:
+        path = Path(token).expanduser()
+        if not path.is_dir():
+            raise ValueError(f"not a directory: {path}")
+        exp_dirs.append(path)
+
+    return exp_dirs
+
+
 def main() -> None:
     """Run the interactive plotter REPL."""
     history_file = os.path.expanduser("~/.plotter_history")
-    completer = PromptSession(
+    session = PromptSession(
         history=FileHistory(history_file),
         completer=CommandCompleter(),
         auto_suggest=AutoSuggestFromHistory(),
     )
     while True:
         try:
-            cmd = completer.prompt("> ").strip()
-            if not cmd:
-                continue
-        except KeyboardInterrupt:
-            cmd = "quit"
+            command_line = session.prompt("> ").strip()
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        if not command_line:
+            continue
 
         # if the command is quit or exit, break the loop and exit the script
-        if cmd.lower() in ("quit", "exit"):
+        if command_line.lower() in ("quit", "exit"):
             break
 
         # parse the command
-        cmd_parts = shlex.split(cmd)
-        command = cmd_parts[0]
-        if command == "plot_2d":
-            exp_dir = cmd_parts[1] if len(cmd_parts) >= 2 else ""
-            plot_opt = cmd_parts[2] if len(cmd_parts) >= 3 else ""
-            save_opt = cmd_parts[3] if len(cmd_parts) >= 4 else ""
-            if not exp_dir:
-                print("No experiment directory defined")
-                continue
-            save_opt = True if save_opt == "save" else False
-            if plot_opt == "ri":
-                _plot_2d(cmd_parts[1], plot_magnitude=False, plot_imag=True, plot_real=True, save=save_opt)
-            elif plot_opt == "r":
-                _plot_2d(cmd_parts[1], plot_magnitude=False, plot_imag=False, plot_real=True, save=save_opt)
-            elif plot_opt == "i":
-                _plot_2d(cmd_parts[1], plot_magnitude=False, plot_imag=True, plot_real=False, save=save_opt)
-            else:
-                _plot_2d(cmd_parts[1], save=save_opt)
-        elif command == "plot_3d_heat":
-            exp_dir = cmd_parts[1] if len(cmd_parts) >= 2 else ""
-            plot_opt = cmd_parts[2] if len(cmd_parts) >= 3 else ""
-            save_opt = cmd_parts[3] if len(cmd_parts) >= 4 else ""
-            save_opt = True if save_opt == "save" else False
-            if not exp_dir:
-                print("No experiment directory defined")
-                continue
-            if plot_opt == "p":
-                _plot_3d_heatmap(cmd_parts[1], plot_magnitude=False, plot_phase=True, save=save_opt)
-            elif plot_opt == "r":
-                _plot_3d_heatmap(cmd_parts[1], plot_magnitude=False, plot_imag=False, plot_real=True, save=save_opt)
-            elif plot_opt == "i":
-                _plot_3d_heatmap(cmd_parts[1], plot_magnitude=False, plot_imag=True, plot_real=False, save=save_opt)
-            else:
-                _plot_3d_heatmap(cmd_parts[1], save=save_opt)
-        elif command == "plot_iq":
-            exp_dir_0 = cmd_parts[1] if len(cmd_parts) >= 2 else ""
-            exp_dir_1 = cmd_parts[2] if len(cmd_parts) >= 3 else ""
-            save_opt = cmd_parts[3] if len(cmd_parts) >= 4 else ""
-            save_opt = True if save_opt == "save" else False
-            if len(cmd_parts) < 3:
-                print("command must contain two experiment directories")
-                continue
-            else:
-                _plot_iq(exp_dir_0, exp_dir_1, save_opt)
-        elif command == "plot_spectr":
-            exp_dir_0 = cmd_parts[1] if len(cmd_parts) >= 2 else ""
-            exp_dir_1 = cmd_parts[2] if len(cmd_parts) >= 3 else ""
-            save_opt = cmd_parts[3] if len(cmd_parts) >= 4 else ""
-            save_opt = True if save_opt == "save" else False
-            if len(cmd_parts) < 3:
-                print("command must contain two experiment directories")
-                continue
-            else:
-                _plot_spectr(exp_dir_0, exp_dir_1, save_opt)
-        else:
+        try:
+            tokens = shlex.split(command_line)
+        except ValueError as err:
+            print(f"cannot parse the command: {err}")
+            continue
+
+        if not tokens:
+            continue
+
+        command, *arguments = tokens
+        plotting_func = PLOT_COMMANDS.get(command)
+        if plotting_func is None:
             print(f"Unknown command: {command}")
+            continue
+
+        try:
+            exp_dirs = parse_experiment_dirs(arguments)
+            plotted = load_and_plot(exp_dirs, plotting_func)
+        except KeyboardInterrupt:
+            print("plot interrupted")
+            continue
+        except Exception as err:
+            print(f"{command} failed: {type(err).__name__}: {err}")
+            continue
+
+        print(f"plotted {len(plotted)} acquisition IP(s): {', '.join(plotted)}")
 
 
 if __name__ == "__main__":
