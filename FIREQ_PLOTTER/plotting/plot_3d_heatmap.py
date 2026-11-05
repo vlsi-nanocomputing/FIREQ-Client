@@ -7,6 +7,9 @@ from collections.abc import Sequence
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.cm import ScalarMappable
+from matplotlib.collections import QuadMesh
+from matplotlib.colors import Normalize
 
 from .common import (
     LAYOUT_BASE_BOTTOM,
@@ -38,6 +41,25 @@ HEATMAP_QUANTITY_KEYS: tuple[str, ...] = ("magnitude", "phase", "real", "imag")
 COLORBAR_LEFT: float = 0.935
 COLORBAR_WIDTH: float = 0.02
 IMAGE_TOP: float = 0.92
+
+
+def cell_edges(centers: np.ndarray) -> np.ndarray:
+    """Return the cell edges around sorted cell centres.
+
+    Inner edges are the midpoints between neighbouring centres, outer edges are
+    as far from the first and last centre as the nearest inner edge. A single
+    centre gets a cell of width 1.
+
+    :param centers: sorted cell centres.
+    :type centers: np.ndarray
+    :return: the cell edges, one more than the centres.
+    :rtype: np.ndarray
+    """
+    centers = np.asarray(centers, dtype=float)
+    if centers.size == 1:
+        return np.array([centers[0] - 0.5, centers[0] + 0.5])
+    mids = (centers[:-1] + centers[1:]) / 2
+    return np.concatenate(([2 * centers[0] - mids[0]], mids, [2 * centers[-1] - mids[-1]]))
 
 
 def _plot_3d_heatmap(
@@ -97,17 +119,12 @@ def _plot_3d_heatmap(
     fig, ax = plt.subplots(figsize=(9, 6))
 
     # the colorbar gets its own axes, so that adjusting the subplot never
-    # overlaps it with the image
+    # overlaps it with the image; it follows its own mappable since the mesh is redrawn
     cax = fig.add_axes((COLORBAR_LEFT, 0.1, COLORBAR_WIDTH, 0.5))
-    img = ax.imshow(
-        np.zeros((2, 2)),
-        origin="lower",
-        aspect="auto",
-        interpolation="nearest",
-        cmap=QUANTITY_SPECS[state["quantity"]].cmap,
-    )
-    cbar = fig.colorbar(img, cax=cax)
+    color_scale = ScalarMappable(norm=Normalize(0.0, 1.0), cmap=QUANTITY_SPECS[state["quantity"]].cmap)
+    cbar = fig.colorbar(color_scale, cax=cax)
     cbar.set_label(QUANTITY_SPECS[state["quantity"]].label)
+    meshes: list[QuadMesh] = []
 
     def update() -> None:
         """Redraw the heatmap for the selected quantity, axes and values."""
@@ -129,19 +146,28 @@ def _plot_3d_heatmap(
         y = heat.index.to_numpy()
         data = spec.transform(heat.to_numpy())
 
-        img.set_data(data)
-        img.set_extent([x[0], x[-1], y[0], y[-1]])
+        # cells at their actual coordinates, so list sweeps keep their spacing
+        x_edges = cell_edges(x)
+        y_edges = cell_edges(y)
+        for mesh in meshes:
+            mesh.remove()
+        meshes.clear()
+        mesh = ax.pcolormesh(x_edges, y_edges, np.ma.masked_invalid(data), shading="flat", cmap=spec.cmap)
+        meshes.append(mesh)
 
+        low, high = color_scale.get_clim()
         finite = data[np.isfinite(data)]
         if finite.size:
             low, high = float(finite.min()), float(finite.max())
             if high <= low:
                 # a constant slice has no colour range of its own
                 high = low + 1.0
-            img.set_clim(low, high)
+        mesh.set_clim(low, high)
+        color_scale.set_cmap(spec.cmap)
+        color_scale.set_clim(low, high)
 
-        ax.set_xlim(x[0], x[-1])
-        ax.set_ylim(y[0], y[-1])
+        ax.set_xlim(x_edges[0], x_edges[-1])
+        ax.set_ylim(y_edges[0], y_edges[-1])
         ax.set_xlabel(x_axis)
         ax.set_ylabel(y_axis)
         ax.set_title(ipname if len(plot_dfs) == 1 else f"{ipname} — {names[state['dataset']]}")
@@ -189,9 +215,7 @@ def _plot_3d_heatmap(
         """
         key = label_to_key[label]
         state["quantity"] = key
-        spec = QUANTITY_SPECS[key]
-        img.set_cmap(spec.cmap)
-        cbar.set_label(spec.label)
+        cbar.set_label(QUANTITY_SPECS[key].label)
         update()
 
     def on_x_axis(label: str) -> None:
