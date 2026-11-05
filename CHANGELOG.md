@@ -7,6 +7,23 @@ tag names follow the `version-<major>.<minor>.<patch>` scheme.
 
 ## [Unreleased]
 
+### Fixed
+
+- `experiment_summary.yaml` holds only plain YAML types (written with `safe_dump`, read
+  with `safe_load` by `export`), so exporting a directory cannot run code stored in its
+  summary. Summaries holding Python objects are skipped with a message.
+- `export` of an aborted run keeps the completed iterations and reports how many are
+  missing, instead of failing with `FileNotFoundError`; an acquisition IP with no completed
+  iteration is skipped.
+- `plot_3d_heat` draws each cell at its sweep coordinate, so uneven (list) sweeps keep their
+  spacing, and cells are centred on their value instead of being stretched between the
+  first and last one.
+
+### Changed
+
+- Requires Python 3.11 or newer and numpy 2.3.5 (was 1.26.4, which has no wheels for Python
+  3.13+ and conflicts with pandas 3.0.3 on 3.14).
+
 ## [0.1.1] - 2026-10-23
 
 Requires FIREQ-Server `v0.1.1`.
