@@ -7,6 +7,8 @@ tag names follow the `version-<major>.<minor>.<patch>` scheme.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-06
+
 ### Fixed
 
 - `experiment_summary.yaml` holds only plain YAML types (written with `safe_dump`, read
@@ -165,6 +167,7 @@ Requires FIREQ-Server `v0.1.1`.
   preprocessing, acquisition data handling, the `export` command and the plotting
   utilities.
 
-[Unreleased]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.1...HEAD
+[Unreleased]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.2...HEAD
+[0.1.2]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.1...version-0.1.2
 [0.1.1]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.0...version-0.1.1
 [0.1.0]: https://github.com/vlsi-nanocomputing/FIREQ-Client/releases/tag/version-0.1.0
