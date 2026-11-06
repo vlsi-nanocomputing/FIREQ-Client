@@ -389,7 +389,7 @@ class Client:
 
         # the var order is from outer to inner; a single run has neither
         var_order = message.header.get("variable_order", ["none"])
-        var_values = message.header.get("variable_values", {"none": np.array([0])})
+        var_values = message.header.get("variable_values", {"none": [0]})
 
         # make a points iterator and compute all points (total iterations); only the variables in
         # var_order are swept, variable_values can also hold the unused ones
@@ -690,7 +690,8 @@ class Client:
         :type file_name: str
         """
         with open(os.path.join(dir_name, f"{file_name}.yaml"), "w") as f:
-            yaml.dump(d, f, indent=2)
+            # plain types only, export reads it with safe_load
+            yaml.safe_dump(d, f, indent=2)
 
     def _save_dataframe(self, df: pd.DataFrame, dir_name: str, file_name: str) -> None:
         """Save a DataFrame as pickle in the experiment directory.

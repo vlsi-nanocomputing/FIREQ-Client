@@ -7,6 +7,26 @@ tag names follow the `version-<major>.<minor>.<patch>` scheme.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-06
+
+### Fixed
+
+- `experiment_summary.yaml` holds only plain YAML types (written with `safe_dump`, read
+  with `safe_load` by `export`), so exporting a directory cannot run code stored in its
+  summary. Summaries holding Python objects are skipped with a message.
+- `export` of an aborted run keeps the completed iterations and reports how many are
+  missing, instead of failing with `FileNotFoundError`; an acquisition IP with no completed
+  iteration is skipped.
+- `plot_3d_heat` draws each cell at its sweep coordinate, so uneven (list) sweeps keep their
+  spacing, and cells are centred on their value instead of being stretched between the
+  first and last one.
+
+### Changed
+
+- numpy 2.3.5 (was 1.26.4, which has no wheels for Python 3.13+ and conflicts with pandas
+  3.0.3 on 3.14). Python 3.10 is still supported: it installs numpy 2.2.6, pandas 2.3.3 and
+  matplotlib 3.10.9, the last releases that support it.
+
 ## [0.1.1] - 2026-10-23
 
 Requires FIREQ-Server `v0.1.1`.
@@ -147,6 +167,7 @@ Requires FIREQ-Server `v0.1.1`.
   preprocessing, acquisition data handling, the `export` command and the plotting
   utilities.
 
-[Unreleased]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.1...HEAD
+[Unreleased]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.2...HEAD
+[0.1.2]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.1...version-0.1.2
 [0.1.1]: https://github.com/vlsi-nanocomputing/FIREQ-Client/compare/version-0.1.0...version-0.1.1
 [0.1.0]: https://github.com/vlsi-nanocomputing/FIREQ-Client/releases/tag/version-0.1.0

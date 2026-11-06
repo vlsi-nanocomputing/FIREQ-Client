@@ -3,10 +3,12 @@
 import socket
 
 import numpy as np
+import pandas as pd
 import pytest
 import yaml
 
 from FIREQ_CLIENT.client import Client, ServerError
+from FIREQ_CLIENT.export import export_experiment
 from FIREQ_CLIENT.network import Message, ReceiveWorker, SendWorker
 
 OK = {"type": "status", "msg": "ok"}
@@ -85,6 +87,47 @@ def test_error_during_the_run_ends_with_an_aborted_footer(client, tmp_path):
     _feed(client, OK, SWEEP_HEADER, _dma(), _iteration(100), error, _footer(aborted=True))
     client._fetch_experiment({}, "exp")
     assert _runtimes(tmp_path) == {"runtimes": [100], "run_time": 900, "aborted": True}
+
+
+def test_aborted_run_exports_the_completed_iterations(client, tmp_path, capsys):
+    error = {"type": "error", "msg": "error while running experiment: dma"}
+    _feed(client, OK, SWEEP_HEADER, _dma(), _iteration(100), error, _footer(aborted=True))
+    client._fetch_experiment({}, "exp")
+    (run_dir,) = (tmp_path / "exp").iterdir()
+    export_experiment(run_dir, tmp_path / "out")
+    df = pd.read_pickle(tmp_path / "out" / "data_acq0.pkl")
+    assert sorted(df.index.get_level_values("a").unique()) == [1]
+    assert "1 of 2 iterations missing" in capsys.readouterr().out
+
+
+def test_export_skips_an_acquisition_with_no_completed_iteration(client, tmp_path, capsys):
+    _feed(client, OK, SWEEP_HEADER, _footer(aborted=True))
+    client._fetch_experiment({}, "exp")
+    (run_dir,) = (tmp_path / "exp").iterdir()
+    (run_dir / "acq0").mkdir()
+    export_experiment(run_dir, tmp_path / "out")
+    assert not (tmp_path / "out" / "data_acq0.pkl").exists()
+    assert "no completed iteration" in capsys.readouterr().out
+
+
+def test_single_run_summary_is_plain_yaml(client, tmp_path):
+    header = {"type": "status", "msg": "experiment_header", "shots": 2}
+    _feed(client, OK, header, _dma(), _iteration(100), _footer())
+    client._fetch_experiment({}, "exp")
+    (run_dir,) = (tmp_path / "exp").iterdir()
+    summary = yaml.safe_load((run_dir / "experiment_summary.yaml").read_text())
+    assert summary["var_values"] == {"none": [0]}
+    export_experiment(run_dir, tmp_path / "out")
+    assert (tmp_path / "out" / "data_acq0.pkl").exists()
+
+
+def test_export_skips_a_summary_with_python_objects(tmp_path, capsys):
+    run_dir = tmp_path / "experiment_old"
+    run_dir.mkdir()
+    (run_dir / "experiment_summary.yaml").write_text(yaml.dump({"var_values": {"none": np.array([0])}}))
+    export_experiment(run_dir, tmp_path / "out")
+    assert "cannot be read safely" in capsys.readouterr().out
+    assert not (tmp_path / "out" / "experiment_summary.yaml").exists()
 
 
 def test_warnings_are_skipped(client, tmp_path):
