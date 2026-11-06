@@ -10,14 +10,18 @@ build-backend = "setuptools.build_meta"
 # Project metadata (used by packaging/build tools and some IDEs)
 name = "fireq-client"
 version = "0.1.1"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 
-# Runtime dependencies, aligned with requirements.txt
+# Runtime dependencies, aligned with requirements.txt.
+# Python 3.10 gets the last matplotlib/numpy/pandas releases that support it.
 dependencies = [
-  "matplotlib==3.11.0",
+  "matplotlib==3.10.9; python_version < '3.11'",
+  "matplotlib==3.11.0; python_version >= '3.11'",
   "msgpack==1.2.1",
-  "numpy==2.3.5",
-  "pandas==3.0.3",
+  "numpy==2.2.6; python_version < '3.11'",
+  "numpy==2.3.5; python_version >= '3.11'",
+  "pandas==2.3.3; python_version < '3.11'",
+  "pandas==3.0.3; python_version >= '3.11'",
   "prompt_toolkit==3.0.52",
   "PyYAML==6.0.3",
   "tqdm==4.67.3",
@@ -35,7 +39,7 @@ dev = [
 # Black is used for Python formatting.
 # It reformats code deterministically (no warnings, only formatting).
 line-length = 120
-target-version = ["py311"]
+target-version = ["py310"]
 
 [tool.ruff]
 # Ruff is used only as a linter (static analysis), not as a formatter.

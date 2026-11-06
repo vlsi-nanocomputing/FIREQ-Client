@@ -21,8 +21,9 @@ tag names follow the `version-<major>.<minor>.<patch>` scheme.
 
 ### Changed
 
-- Requires Python 3.11 or newer and numpy 2.3.5 (was 1.26.4, which has no wheels for Python
-  3.13+ and conflicts with pandas 3.0.3 on 3.14).
+- numpy 2.3.5 (was 1.26.4, which has no wheels for Python 3.13+ and conflicts with pandas
+  3.0.3 on 3.14). Python 3.10 is still supported: it installs numpy 2.2.6, pandas 2.3.3 and
+  matplotlib 3.10.9, the last releases that support it.
 
 ## [0.1.1] - 2026-10-23
 

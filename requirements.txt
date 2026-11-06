@@ -1,7 +1,10 @@
-matplotlib==3.11.0
+matplotlib==3.10.9; python_version < "3.11"
+matplotlib==3.11.0; python_version >= "3.11"
 msgpack==1.2.1
-numpy==2.3.5
-pandas==3.0.3
+numpy==2.2.6; python_version < "3.11"
+numpy==2.3.5; python_version >= "3.11"
+pandas==2.3.3; python_version < "3.11"
+pandas==3.0.3; python_version >= "3.11"
 prompt_toolkit==3.0.52
 PyYAML==6.0.3
 tqdm==4.67.3
